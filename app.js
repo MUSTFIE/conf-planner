@@ -4,7 +4,7 @@ import { getDatabase, ref, push, set, onValue, remove, update } from "https://ww
 
 // TODO: 換成你自己的 Firebase 設定
 const firebaseConfig = {
-    apiKey: ""AIzaSyBnwMcgxCxqyQi4n7dc4-ZRZGiFT0dVUFg",
+    apiKey: "AIzaSyBnwMcgxCxqyQi4n7dc4-ZRZGiFT0dVUFg",
     authDomain: "conference-c7eee.firebaseapp.com",
     databaseURL: "https://conference-c7eee-default-rtdb.asia-southeast1.firebasedatabase.app/",
     projectId: "conference-c7eee",
