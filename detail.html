@@ -18,8 +18,14 @@
                     </h1>
                     <p class="text-xs text-gray-500 mt-0.5">多模組自動化協作與即時同步平台 • 住宿升級版</p>
                 </div>
-                <div class="text-xs text-gray-400 bg-gray-100 px-3 py-1.5 rounded-xl font-medium">
-                    自動儲存已啟用
+                <!-- 新增：跳轉至活動專屬詳情頁面的快速按鈕 -->
+                <div class="flex items-center gap-2">
+                    <a href="detail.html?id=aviation-2026" class="bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-2 rounded-xl transition border border-blue-200 flex items-center gap-1">
+                        <span>📋</span> 查看當前活動詳情 &rarr;
+                    </a>
+                    <div class="text-xs text-gray-400 bg-gray-100 px-3 py-2 rounded-xl font-medium">
+                        自動儲存已啟用
+                    </div>
                 </div>
             </div>
 
@@ -35,9 +41,21 @@
         
         <!-- 1. 總結儀表板 -->
         <div id="tab-summary" class="tab-content space-y-6">
-            <header class="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-gray-100">
-                <h2 class="text-xl md:text-2xl font-bold text-gray-900 mb-1">籌備工作總結儀表板</h2>
-                <p class="text-gray-500 text-xs md:text-sm">即時追蹤所有籌備模組的綜合進度與狀態。</p>
+            <header class="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 class="text-xl md:text-2xl font-bold text-gray-900 mb-1">籌備工作總結儀表板</h2>
+                    <p class="text-gray-500 text-xs md:text-sm">即時追蹤所有籌備模組的綜合進度與狀態。</p>
+                </div>
+                <!-- 專屬活動切換導引區塊 -->
+                <div class="flex items-center gap-2 bg-gray-50 p-2 rounded-xl border border-gray-100">
+                    <span class="text-xs text-gray-500 font-medium px-2">切換活動詳情：</span>
+                    <a href="detail.html?id=aviation-2026" class="text-xs bg-white hover:bg-blue-600 hover:text-white text-gray-700 font-semibold px-3 py-1.5 rounded-lg border border-gray-200 transition shadow-sm">
+                        智慧航空研討會
+                    </a>
+                    <a href="detail.html?id=engineering-forum" class="text-xs bg-white hover:bg-blue-600 hover:text-white text-gray-700 font-semibold px-3 py-1.5 rounded-lg border border-gray-200 transition shadow-sm">
+                        工程教育論壇
+                    </a>
+                </div>
             </header>
             
             <div class="bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-gray-100">
@@ -367,7 +385,6 @@
             localStorage.setItem('conference_modules_data', JSON.stringify(dataToSave));
         }
 
-        // 自動同步講者名單名字至住宿管理模組 (不自動代入英文名字)
         function syncSpeakersToAccommodation() {
             if (!modulesData.speakers || !modulesData.accommodation) return;
             const speakers = modulesData.speakers.items;
@@ -397,7 +414,6 @@
             saveData();
         }
 
-        // 渲染上方分頁方塊按鈕
         function renderNavTabs() {
             const container = document.getElementById('nav-tabs-container');
             container.innerHTML = '';
@@ -481,10 +497,10 @@
                 totalCompletedAll += completed;
 
                 container.innerHTML += `
-                    <div onclick="switchTab('${key}')" class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md cursor-pointer transition flex flex-col justify-between">
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition flex flex-col justify-between">
                         <div>
                             <div class="flex justify-between items-start mb-2">
-                                <h3 class="font-bold text-gray-900 text-base">${mod.title}</h3>
+                                <h3 onclick="switchTab('${key}')" class="font-bold text-gray-900 text-base cursor-pointer hover:text-blue-600 transition">${mod.title}</h3>
                                 <span class="text-xs font-bold px-2 py-1 rounded-lg bg-gray-100 text-gray-600">${percent}%</span>
                             </div>
                             <p class="text-xs text-gray-400 mb-4 line-clamp-2">${mod.desc || ''}</p>
@@ -495,7 +511,7 @@
                             </div>
                             <div class="text-xs text-gray-400 flex justify-between items-center">
                                 <span>項目進度: ${completed} / ${total}</span>
-                                <span class="text-blue-600 font-medium hover:underline">進入模組 &rarr;</span>
+                                <button onclick="switchTab('${key}')" class="text-blue-600 font-medium hover:underline">進入模組 &rarr;</button>
                             </div>
                         </div>
                     </div>
