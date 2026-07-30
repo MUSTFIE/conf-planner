@@ -9,10 +9,38 @@
 </head>
 <body class="bg-gray-50 text-gray-800">
 
-    <div class="max-w-4xl mx-auto p-6">
+    <!-- 1. 獨立的登入頁面容器 -->
+    <div id="login-page" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-8 border border-gray-100">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-blue-600 mb-2">系統登入</h1>
+                <p class="text-sm text-gray-500">學術會議籌備管理系統</p>
+            </div>
+            <form id="login-form" class="space-y-5">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">用戶名稱</label>
+                    <input type="text" id="login-username" required placeholder="請輸入用戶名稱" class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">登入密碼</label>
+                    <input type="password" id="login-password" required placeholder="請輸入密碼" class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div id="login-error" class="text-red-500 text-sm hidden text-center bg-red-50 py-2 rounded-lg">用戶名稱或密碼錯誤，請重新輸入。</div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition shadow-md">
+                    登入系統
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. 主系統內容容器 (預設隱藏，登入後顯示) -->
+    <div id="main-app" class="max-w-4xl mx-auto p-6 hidden">
         <header class="mb-8 flex justify-between items-center">
             <h1 class="text-3xl font-bold text-blue-600">學術會議籌備管理</h1>
-            <span id="sync-status" class="text-sm text-gray-500">連線中...</span>
+            <div class="flex items-center gap-3">
+                <span id="sync-status" class="text-sm text-gray-500">連線中...</span>
+                <button id="logout-btn" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1.5 rounded-lg transition font-medium">登出</button>
+            </div>
         </header>
 
         <!-- 新增/編輯活動表單 -->
@@ -20,14 +48,14 @@
             <h2 id="form-title" class="text-xl font-semibold mb-4">新增學術會議</h2>
             <form id="add-event-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <input type="hidden" id="event-id">
-<div>
-    <label class="block text-sm font-medium text-gray-700 mb-1">活動中文名稱 <span class="text-gray-400 text-xs">(中英擇一必填)</span></label>
-    <input type="text" id="event-name-zh" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
-</div>
-<div>
-    <label class="block text-sm font-medium text-gray-700 mb-1">活動英文名稱 <span class="text-gray-400 text-xs">(中英擇一必填)</span></label>
-    <input type="text" id="event-name-en" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
-</div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">活動中文名稱 <span class="text-gray-400 text-xs">(中英擇一必填)</span></label>
+                    <input type="text" id="event-name-zh" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">活動英文名稱 <span class="text-gray-400 text-xs">(中英擇一必填)</span></label>
+                    <input type="text" id="event-name-en" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">會議日期 <span class="text-red-500">*</span></label>
                     <div class="grid grid-cols-2 gap-2">
@@ -65,14 +93,20 @@
 
         <!-- 活動列表 -->
         <section>
-            <div class="flex justify-between items-center mb-4">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
                 <h2 class="text-xl font-semibold">現有會議列表</h2>
-                <div class="flex items-center gap-2">
-                    <label for="sort-order" class="text-sm text-gray-600 font-medium">排序方式：</label>
-                    <select id="sort-order" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                        <option value="asc">日期由近到遠 (升序)</option>
-                        <option value="desc">日期由遠到近 (降序)</option>
-                    </select>
+                <div class="flex flex-wrap items-center gap-2">
+                    <!-- 導出 CSV 按鈕 -->
+                    <button type="button" id="export-csv-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm">
+                        📥 導出 CSV
+                    </button>
+                    <div class="flex items-center gap-2">
+                        <label for="sort-order" class="text-sm text-gray-600 font-medium">排序：</label>
+                        <select id="sort-order" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <option value="asc">日期由近到遠</option>
+                            <option value="desc">日期由遠到近</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div id="event-list" class="flex flex-col gap-3">
@@ -85,7 +119,7 @@
     <!-- 內嵌 Firebase 與頁面邏輯 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, push, update, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, push, update, remove, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBnwMcgxCxqyQi4n7dc4-ZRZGiFT0dVUFg",
@@ -99,6 +133,49 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
+
+        // DOM 元素
+        const loginPage = document.getElementById("login-page");
+        const mainApp = document.getElementById("main-app");
+        const loginForm = document.getElementById("login-form");
+        const loginUsernameInput = document.getElementById("login-username");
+        const loginPasswordInput = document.getElementById("login-password");
+        const loginError = document.getElementById("login-error");
+        const logoutBtn = document.getElementById("logout-btn");
+        const exportCsvBtn = document.getElementById("export-csv-btn");
+
+        // 檢查登入狀態
+        if (sessionStorage.getItem("isLoggedIn") === "true") {
+            showMainApp();
+        }
+
+        loginForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const username = loginUsernameInput.value.trim();
+            const password = loginPasswordInput.value.trim();
+
+            if (username === "FIEMUST" && password === "3735") {
+                sessionStorage.setItem("isLoggedIn", "true");
+                loginError.classList.add("hidden");
+                loginForm.reset();
+                showMainApp();
+            } else {
+                loginError.classList.remove("hidden");
+            }
+        });
+
+        logoutBtn.addEventListener("click", () => {
+            sessionStorage.removeItem("isLoggedIn");
+            mainApp.classList.add("hidden");
+            loginPage.classList.remove("flex");
+            loginPage.classList.remove("hidden");
+            loginPage.style.display = "flex";
+        });
+
+        function showMainApp() {
+            loginPage.style.display = "none";
+            mainApp.classList.remove("hidden");
+        }
 
         const form = document.getElementById("add-event-form");
         const eventListEl = document.getElementById("event-list");
@@ -116,22 +193,21 @@
         form.addEventListener("submit", (e) => {
             e.preventDefault();
             const id = eventIdInput.value;
-           const nameZh = document.getElementById("event-name-zh").value.trim();
-const nameEn = document.getElementById("event-name-en").value.trim();
+            const nameZh = document.getElementById("event-name-zh").value.trim();
+            const nameEn = document.getElementById("event-name-en").value.trim();
 
-// 驗證：中英文至少需填寫一項
-if (!nameZh && !nameEn) {
-    alert("請至少填寫「活動中文名稱」或「活動英文名稱」其中一項！");
-    return; // 中止提交，等待使用者填寫
-}
+            if (!nameZh && !nameEn) {
+                alert("請至少填寫「活動中文名稱」或「活動英文名稱」其中一項！");
+                return;
+            }
 
-// 名稱組合邏輯：若都有填顯示"中文(英文)"，若只填一項則顯示該項
-let name = "";
-if (nameZh && nameEn) {
-    name = `${nameZh} (${nameEn})`;
-} else {
-    name = nameZh || nameEn;
-}
+            let name = "";
+            if (nameZh && nameEn) {
+                name = `${nameZh} (${nameEn})`;
+            } else {
+                name = nameZh || nameEn;
+            }
+
             const startDate = document.getElementById("event-start-date").value;
             const endDate = document.getElementById("event-end-date").value;
             const academicLead = document.getElementById("event-academic-lead").value;
@@ -139,7 +215,6 @@ if (nameZh && nameEn) {
             const department = document.getElementById("event-department").value;
             const location = document.getElementById("event-location").value;
 
-            // 組合日期字串（若有結束日期且大於等於開始日期則顯示區間，否則為單日）
             let dateDisplay = startDate;
             if (endDate && endDate >= startDate) {
                 dateDisplay = `${startDate} ~ ${endDate}`;
@@ -157,7 +232,6 @@ if (nameZh && nameEn) {
             };
 
             if (id) {
-                // 更新現有資料
                 const eventRef = ref(db, `events/${id}`);
                 update(eventRef, eventData).then(() => {
                     resetForm();
@@ -165,7 +239,6 @@ if (nameZh && nameEn) {
                     alert("更新失敗：" + error.message);
                 });
             } else {
-                // 新增資料
                 const eventsRef = ref(db, 'events');
                 push(eventsRef, eventData).then(() => {
                     form.reset();
@@ -175,12 +248,10 @@ if (nameZh && nameEn) {
             }
         });
 
-        // 取消編輯按鈕事件
         cancelEditBtn.addEventListener("click", () => {
             resetForm();
         });
 
-        // 排序條件改變時重新渲染
         sortOrderSelect.addEventListener("change", () => {
             if (window.lastEventData) {
                 renderEventList(window.lastEventData);
@@ -196,15 +267,56 @@ if (nameZh && nameEn) {
             cancelEditBtn.classList.add("hidden");
         }
 
-        // 即時監聽活動列表
         const eventsRef = ref(db, 'events');
         onValue(eventsRef, (snapshot) => {
             const data = snapshot.val();
-            window.lastEventData = data; // 快取資料以供排序使用
+            window.lastEventData = data;
             renderEventList(data);
         }, (error) => {
             console.error(error);
             eventListEl.innerHTML = `<p class="text-red-500">讀取資料失敗，請確認 Firebase Rules 權限與連線設定。</p>`;
+        });
+
+        // 導出 CSV 功能
+        exportCsvBtn.addEventListener("click", () => {
+            const data = window.lastEventData;
+            if (!data) {
+                alert("目前沒有可導出的會議資料！");
+                return;
+            }
+
+            // CSV 標頭
+            let csvContent = "\uFEFF"; // 加入 BOM 避免中文亂碼
+            csvContent += "會議名稱,日期,負責部門,會議地點,學術負責人,行政負責人,進度百分比\n";
+
+            Object.keys(data).forEach((key) => {
+                const event = data[key];
+                const tasks = event.tasks ? Object.values(event.tasks) : [];
+                const totalTasks = tasks.length;
+                const completedTasks = tasks.filter(t => t.completed).length;
+                const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+                // 欄位內容包雙引號以防內容含有逗號
+                const name = `"${(event.name || "").replace(/"/g, '""')}"`;
+                const date = `"${(event.date || "").replace(/"/g, '""')}"`;
+                const department = `"${(event.department || "未填寫").replace(/"/g, '""')}"`;
+                const location = `"${(event.location || "未填寫").replace(/"/g, '""')}"`;
+                const academicLead = `"${(event.academicLead || "未填寫").replace(/"/g, '""')}"`;
+                const adminLead = `"${(event.adminLead || "未填寫").replace(/"/g, '""')}"`;
+                const progressStr = `"${progress}%"`;
+
+                csvContent += `${name},${date},${department},${location},${academicLead},${adminLead},${progressStr}\n`;
+            });
+
+            // 建立下載連結
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.setAttribute("href", url);
+            a.setAttribute("download", `academic_conferences_${new Date().toISOString().slice(0, 10)}.csv`);
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         });
 
         function renderEventList(data) {
@@ -215,7 +327,6 @@ if (nameZh && nameEn) {
                 return;
             }
 
-            // 轉換為陣列並進行排序
             const sortOrder = sortOrderSelect.value;
             const eventKeys = Object.keys(data);
             
@@ -236,34 +347,32 @@ if (nameZh && nameEn) {
                 const completedTasks = tasks.filter(t => t.completed).length;
                 const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-                // 建立優化後的直式清單項目
                 const item = document.createElement("div");
                 item.className = "bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4";
                 
-                // 處理負責部門、負責人與地點的顯示邏輯（若未填寫則顯示較淡的字樣）
                 const departmentHtml = event.department 
-                    ? `<span class="inline-flex items-center text-gray-700 bg-gray-100 px-2.5 py-1 rounded-md text-xs font-medium">🏢 部門：${escapeHtml(event.department)}</span>` 
-                    : `<span class="inline-flex items-center text-gray-400 bg-gray-50 px-2.5 py-1 rounded-md text-xs font-medium">🏢 部門：未填寫</span>`;
+                    ? `<span class="inline-flex items-center text-gray-800 bg-gray-100 px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200">🏢 部門：${escapeHtml(event.department)}</span>` 
+                    : `<span class="inline-flex items-center text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg text-sm font-medium border border-dashed border-gray-200">🏢 部門：未填寫</span>`;
 
                 const locationHtml = event.location 
-                    ? `<span class="inline-flex items-center text-gray-700 bg-gray-100 px-2.5 py-1 rounded-md text-xs font-medium">📍 地點：${escapeHtml(event.location)}</span>` 
-                    : `<span class="inline-flex items-center text-gray-400 bg-gray-50 px-2.5 py-1 rounded-md text-xs font-medium">📍 地點：未填寫</span>`;
+                    ? `<span class="inline-flex items-center text-gray-800 bg-blue-50 px-3 py-1.5 rounded-lg text-sm font-medium border border-blue-100">📍 地點：${escapeHtml(event.location)}</span>` 
+                    : `<span class="inline-flex items-center text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg text-sm font-medium border border-dashed border-gray-200">📍 地點：未填寫</span>`;
                 
                 const academicHtml = event.academicLead 
-                    ? `<span class="inline-flex items-center text-gray-700 bg-gray-100 px-2.5 py-1 rounded-md text-xs font-medium">🎓 學術：${escapeHtml(event.academicLead)}</span>` 
-                    : `<span class="inline-flex items-center text-gray-400 bg-gray-50 px-2.5 py-1 rounded-md text-xs font-medium">🎓 學術：未填寫</span>`;
+                    ? `<span class="inline-flex items-center text-gray-800 bg-indigo-50 px-3 py-1.5 rounded-lg text-sm font-medium border border-indigo-100">🎓 學術：${escapeHtml(event.academicLead)}</span>` 
+                    : `<span class="inline-flex items-center text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg text-sm font-medium border border-dashed border-gray-200">🎓 學術：未填寫</span>`;
                 
                 const adminHtml = event.adminLead 
-                    ? `<span class="inline-flex items-center text-gray-700 bg-gray-100 px-2.5 py-1 rounded-md text-xs font-medium">📋 行政：${escapeHtml(event.adminLead)}</span>` 
-                    : `<span class="inline-flex items-center text-gray-400 bg-gray-50 px-2.5 py-1 rounded-md text-xs font-medium">📋 行政：未填寫</span>`;
+                    ? `<span class="inline-flex items-center text-gray-800 bg-emerald-50 px-3 py-1.5 rounded-lg text-sm font-medium border border-emerald-100">📋 行政：${escapeHtml(event.adminLead)}</span>` 
+                    : `<span class="inline-flex items-center text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg text-sm font-medium border border-dashed border-gray-200">📋 行政：未填寫</span>`;
 
                 item.innerHTML = `
                     <div class="flex-1 cursor-pointer w-full" data-detail-id="${key}">
-                        <div class="flex flex-wrap items-center gap-2 mb-2">
+                        <div class="flex flex-wrap items-center gap-2 mb-3">
                             <h3 class="text-lg font-bold text-gray-800">${escapeHtml(event.name)}</h3>
                             <span class="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full font-semibold border border-blue-100">📅 ${event.date}</span>
                         </div>
-                        <div class="flex flex-wrap gap-2">
+                        <div class="flex flex-wrap gap-2.5">
                             ${departmentHtml}
                             ${locationHtml}
                             ${academicHtml}
@@ -287,16 +396,19 @@ if (nameZh && nameEn) {
                             <button type="button" class="detail-btn px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm font-medium rounded-lg transition" data-detail-id="${key}">
                                 詳細
                             </button>
+                            <button type="button" class="delete-btn px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium rounded-lg transition" data-id="${key}">
+                                刪除
+                            </button>
                         </div>
                     </div>
                 `;
 
-                // 綁定「編輯」按鈕點擊事件（帶入資料至表單）
+                // 編輯按鈕事件
                 item.querySelector(".edit-btn").addEventListener("click", (e) => {
                     e.stopPropagation();
                     eventIdInput.value = key;
                     document.getElementById("event-name-zh").value = event.name || "";
-document.getElementById("event-name-en").value = "";
+                    document.getElementById("event-name-en").value = "";
                     document.getElementById("event-start-date").value = event.startDate || (event.date && !event.date.includes("~") ? event.date : "") || "";
                     document.getElementById("event-end-date").value = event.endDate || "";
                     document.getElementById("event-academic-lead").value = event.academicLead || "";
@@ -312,7 +424,18 @@ document.getElementById("event-name-en").value = "";
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
 
-                // 綁定點擊跳轉至詳細頁面 (附帶 id 與 name)
+                // 刪除按鈕事件
+                item.querySelector(".delete-btn").addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    if (confirm(`確定要刪除會議「${event.name}」嗎？此動作無法復原。`)) {
+                        const eventRef = ref(db, `events/${key}`);
+                        remove(eventRef).catch((error) => {
+                            alert("刪除失敗：" + error.message);
+                        });
+                    }
+                });
+
+                // 點擊進入詳細頁面
                 item.querySelectorAll("[data-detail-id]").forEach(el => {
                     el.addEventListener("click", () => {
                         window.location.href = `detail.html?id=${key}&name=${encodeURIComponent(event.name)}`;
@@ -323,7 +446,6 @@ document.getElementById("event-name-en").value = "";
             });
         }
 
-        // 防止 XSS 攻擊工具
         function escapeHtml(text) {
             if (!text) return '';
             const map = {
