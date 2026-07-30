@@ -292,10 +292,10 @@
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                 });
 
-                // 綁定點擊跳轉至詳細頁面
+                // 綁定點擊跳轉至詳細頁面 (附帶 id 與 name)
                 item.querySelectorAll("[data-detail-id]").forEach(el => {
                     el.addEventListener("click", () => {
-                        window.location.href = `detail.html?id=${key}`;
+                        window.location.href = `detail.html?id=${key}&name=${encodeURIComponent(event.name)}`;
                     });
                 });
 
