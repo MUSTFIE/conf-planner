@@ -72,12 +72,11 @@
     <!-- 主內容容器 -->
     <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 md:p-6 space-y-6">
 
-        <!-- 1. 總結儀表板 -->
+        <!-- 1. 會議總結 -->
         <div id="view-summary" class="tab-view space-y-6">
             <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h2 class="text-lg sm:text-xl font-bold text-slate-900">籌備工作總覽</h2>
-                    <p class="text-slate-500 text-xs sm:text-sm mt-1">即時整合所有工程會議籌備分組之進度、物料收集與財務動態。</p>
                 </div>
                 <div class="bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-left md:text-right w-full md:w-auto flex flex-row md:flex-col justify-between md:justify-center items-center md:items-end">
                     <span class="text-xs text-slate-500 font-medium">整體執行完成度</span>
@@ -212,7 +211,10 @@
                     <h2 class="text-lg sm:text-xl font-bold text-slate-900">🏨 住宿安排模組</h2>
                     <p class="text-slate-500 text-xs sm:text-sm mt-1">與講者名單雙向同步，亦支援手動增加同行人員。</p>
                 </div>
-                <input type="text" id="acc-search" oninput="renderAccommodation()" placeholder="🔍 搜尋姓名或證件號..." class="w-full md:w-64 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+                    <span id="acc-progress-badge" class="text-xs sm:text-sm font-bold bg-brand-50 text-brand-700 px-4 py-2 rounded-xl border border-brand-100 text-center">完成度: 0%</span>
+                    <input type="text" id="acc-search" oninput="renderAccommodation()" placeholder="🔍 搜尋姓名..." class="w-full md:w-64 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                </div>
             </div>
 
             <!-- 手動新增住宿者 -->
@@ -220,7 +222,7 @@
                 <h3 id="acc-form-title" class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
                     <span class="w-2 h-2 rounded-full bg-brand-600"></span> 手動新增 / 修改住宿人員
                 </h3>
-                <form id="form-accommodation" onsubmit="handleAccommodationSubmit(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <form id="form-accommodation" onsubmit="handleAccommodationSubmit(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <input type="hidden" id="acc-id">
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">姓名 *</label>
@@ -231,14 +233,10 @@
                         <input type="text" id="acc-engname" placeholder="Zhang San" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">證件號碼</label>
-                        <input type="text" id="acc-idnum" placeholder="Passport / ID No." class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                    </div>
-                    <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">飯店預約號</label>
                         <input type="text" id="acc-confno" placeholder="BK-100293" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                     </div>
-                    <div class="sm:col-span-2 lg:col-span-4 flex justify-end gap-3">
+                    <div class="sm:col-span-2 lg:col-span-3 flex justify-end gap-3">
                         <button type="button" id="acc-cancel-btn" onclick="resetAccForm()" class="hidden text-sm bg-slate-100 text-slate-700 py-2.5 px-5 rounded-xl w-full sm:w-auto">取消</button>
                         <button type="submit" id="acc-submit-btn" class="text-sm bg-brand-600 text-white font-medium py-2.5 px-5 rounded-xl shadow-sm w-full sm:w-auto">新增住宿</button>
                     </div>
@@ -253,7 +251,6 @@
                             <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold">
                                 <th class="p-4">住房人員 / 來源</th>
                                 <th class="p-4">護照 / 英文姓名</th>
-                                <th class="p-4">證件號碼</th>
                                 <th class="p-4">訂房確認碼</th>
                                 <th class="p-3 text-center">已預訂</th>
                                 <th class="p-3 text-center">已入住確認</th>
@@ -432,36 +429,30 @@
     </main>
 
     <script>
-        // 系統預設資料集
+        // 系統預設資料集（已清除所有預填項）
         const initialSchema = {
-            summary: { title: "📊 總結儀表板" },
+            summary: { title: "📊 會議總結" },
             speakers: {
                 title: "🎙️ 講者管理",
                 desc: "管理學術研討會 Keynote 及 Invited Speakers 檔案與提交物料。",
-                items: [
-                    { id: 101, name: "Prof. John Doe", title: "Chair Prof.", position: "院長 / 講座教授", org: "麻省理工學院 (MIT)", email: "j.doe@mit.edu", identity: "Keynote Speaker", tasks: { invitation: true, photo: true, bio: true, abstract: true, idCard: false, accommodation: true, transport: true }, remark: "行程已確認，需接機" },
-                    { id: 102, name: "Dr. Alice Smith", title: "Dr.", position: "副教授", org: "史丹佛大學", email: "asmith@stanford.edu", identity: "Invited Speaker", tasks: { invitation: true, photo: true, bio: false, abstract: false, idCard: false, accommodation: false, transport: false }, remark: "等待 Abstract 提交" }
-                ]
+                items: []
             },
             accommodation: {
                 title: "🏨 住宿安排",
-                desc: "掌握研討會貴賓飯店房間預訂狀態與證件登記資訊。",
+                desc: "掌握研討會貴賓飯店房間預訂狀態。",
                 items: []
             },
             finance: {
                 title: "💰 財務預算",
                 desc: "精準追蹤會議收支、匯率折算與供應商結算狀態。",
-                items: [
-                    { id: 301, type: "income", name: "一般代表註冊費", currency: "MOP", price: 2500, qty: 40, rate: 1, total: 100000, payer: "與會代表", supplier: "籌委會", completed: true },
-                    { id: 302, type: "expense", name: "大會場地租金", currency: "MOP", price: 35000, qty: 1, rate: 1, total: 35000, payer: "籌委會", supplier: "大學演藝廳", completed: true }
-                ]
+                items: []
             },
-            guests: { title: "🤝 嘉賓管理", desc: "邀請主禮嘉賓、校領導與學術界代表。", items: [{ id: 401, name: "寄送主禮嘉賓剪彩邀請函", sub: "已寄送 5 位", completed: true }] },
-            venue: { title: "🏢 場地設備", desc: "會議廳、分會場教室與展覽區之劃分。", items: [{ id: 501, name: "簽署主會場租借合約", sub: "負責人：張工", completed: true }] },
-            catering: { title: "🍱 餐飲規劃", desc: "茶歇與晚宴準備。", items: [{ id: 601, name: "確認兩日 Tea Break 菜單", sub: "負責人：李助理", completed: false }] },
-            design: { title: "🎨 設計物料", desc: "主視覺、海報、手冊與名牌。", items: [{ id: 701, name: "大會 Key Visual 定案", sub: "設計師 Alice", completed: true }] },
-            transport: { title: "🚗 交通接駁", desc: "機場接送與專車調派。", items: [{ id: 801, name: "統計講者航班", sub: "運輸組", completed: false }] },
-            pr: { title: "📢 公關徵稿", desc: "CFP 發布與新聞稿。", items: [{ id: 901, name: "發布 CFP 廣宣", sub: "公關組", completed: true }] }
+            guests: { title: "🤝 嘉賓管理", desc: "邀請主禮嘉賓、校領導與學術界代表。", items: [] },
+            venue: { title: "🏢 場地設備", desc: "會議廳、分會場教室與展覽區之劃分。", items: [] },
+            catering: { title: "🍱 餐飲規劃", desc: "茶歇與晚宴準備。", items: [] },
+            design: { title: "🎨 設計物料", desc: "主視覺、海報、手冊與名牌。", items: [] },
+            transport: { title: "🚗 交通接駁", desc: "機場接送與專車調派。", items: [] },
+            pr: { title: "📢 公關徵稿", desc: "CFP 發布與新聞稿。", items: [] }
         };
 
         let db = {};
@@ -510,7 +501,7 @@
                 if (!exist && sp.tasks && sp.tasks.accommodation) {
                     accItems.push({
                         id: Date.now() + Math.floor(Math.random() * 1000), speakerId: sp.id, name: sp.name,
-                        engName: "", idNumber: "", confirmationNo: "", booked: false, confirmed: false, isManual: false
+                        engName: "", confirmationNo: "", booked: false, confirmed: false, isManual: false
                     });
                 } else if (exist) {
                     exist.speakerId = sp.id;
@@ -535,7 +526,6 @@
             });
         }
 
-        // 修改 switchTab 支援跨頁面搜尋/過濾
         function switchTab(tabKey, filterQuery = null) {
             activeTab = tabKey;
             renderNav();
@@ -647,7 +637,6 @@
                 let taskTds = '';
                 taskKeys.forEach(k => {
                     const checked = sp.tasks && sp.tasks[k];
-                    // 住宿關聯的捷徑設計
                     let extraUI = '';
                     if (k === 'accommodation' && checked) {
                         extraUI = `<br><button onclick="switchTab('accommodation', '${escapeHtml(sp.name)}')" class="mt-1 text-[10px] text-brand-600 bg-brand-100/50 px-1.5 py-0.5 rounded hover:bg-brand-200 transition">🏨 前往住宿</button>`;
@@ -715,7 +704,7 @@
                 const sp = db.speakers.items.find(s => s.id == editId);
                 if (sp) Object.assign(sp, payload);
             } else {
-                db.speakers.items.push({ id: Date.now(), ...payload, tasks: {}, remark: "" });
+                db.speakers.items.push({ id: Date.now(), ...payload, tasks: { accommodation: true }, remark: "" });
             }
             saveDB(); syncSpeakersToAccommodation(); renderSpeakers(); resetSpeakerForm();
         }
@@ -752,11 +741,20 @@
             const filter = (document.getElementById('acc-search').value || '').toLowerCase();
 
             const items = db.accommodation.items.filter(a => 
-                a.name.toLowerCase().includes(filter) || (a.idNumber && a.idNumber.toLowerCase().includes(filter))
+                a.name.toLowerCase().includes(filter) || (a.engName && a.engName.toLowerCase().includes(filter))
             );
 
+            let totalTasks = items.length * 2;
+            let completedTasks = 0;
+            items.forEach(a => {
+                if (a.booked) completedTasks++;
+                if (a.confirmed) completedTasks++;
+            });
+            const rate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+            document.getElementById('acc-progress-badge').innerText = `完成度: ${rate}% (${completedTasks}/${totalTasks})`;
+
             if (items.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-slate-400">無符合條件的住宿紀錄。</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400">無符合條件的住宿紀錄。</td></tr>`;
                 return;
             }
 
@@ -770,7 +768,6 @@
                     <tr class="hover:bg-slate-50/80 transition">
                         <td class="p-4 font-bold text-slate-800">${escapeHtml(acc.name)} ${badge}</td>
                         <td class="p-4"><input type="text" value="${escapeHtml(acc.engName || '')}" onchange="updateAccField(${acc.id}, 'engName', this.value)" placeholder="English Name" class="w-full bg-transparent border-b border-slate-200 focus:border-brand-500 text-xs sm:text-sm outline-none py-1"></td>
-                        <td class="p-4"><input type="text" value="${escapeHtml(acc.idNumber || '')}" onchange="updateAccField(${acc.id}, 'idNumber', this.value)" placeholder="證件號" class="w-full bg-transparent border-b border-slate-200 focus:border-brand-500 text-xs sm:text-sm outline-none py-1"></td>
                         <td class="p-4"><input type="text" value="${escapeHtml(acc.confirmationNo || '')}" onchange="updateAccField(${acc.id}, 'confirmationNo', this.value)" placeholder="預約號" class="w-full bg-transparent border-b border-slate-200 focus:border-brand-500 text-xs sm:text-sm outline-none py-1"></td>
                         <td class="p-3 text-center"><input type="checkbox" ${acc.booked ? 'checked' : ''} onchange="toggleAccCheck(${acc.id}, 'booked')" class="w-5 h-5 text-brand-600 rounded border-slate-300 cursor-pointer"></td>
                         <td class="p-3 text-center"><input type="checkbox" ${acc.confirmed ? 'checked' : ''} onchange="toggleAccCheck(${acc.id}, 'confirmed')" class="w-5 h-5 text-brand-600 rounded border-slate-300 cursor-pointer"></td>
@@ -796,7 +793,7 @@
                     const sp = db.speakers.items.find(s => s.id === acc.speakerId);
                     if (sp) {
                         if (!sp.tasks) sp.tasks = {};
-                        sp.tasks.accommodation = true; // 狀態改變保證已勾選該講者住宿
+                        sp.tasks.accommodation = true;
                     }
                 }
                 saveDB(); renderAccommodation();
@@ -807,8 +804,9 @@
             e.preventDefault();
             const editId = document.getElementById('acc-id').value;
             const payload = {
-                name: document.getElementById('acc-name').value.trim(), engName: document.getElementById('acc-engname').value.trim(),
-                idNumber: document.getElementById('acc-idnum').value.trim(), confirmationNo: document.getElementById('acc-confno').value.trim()
+                name: document.getElementById('acc-name').value.trim(), 
+                engName: document.getElementById('acc-engname').value.trim(),
+                confirmationNo: document.getElementById('acc-confno').value.trim()
             };
             if (editId) {
                 const acc = db.accommodation.items.find(a => a.id == editId);
@@ -823,7 +821,7 @@
             const acc = db.accommodation.items.find(a => a.id === id);
             if (!acc) return;
             document.getElementById('acc-id').value = acc.id;
-            ['name','engName','idNumber','confirmationNo'].forEach(k => document.getElementById('acc-'+k.toLowerCase()).value = acc[k] || '');
+            ['name','engName','confirmationNo'].forEach(k => document.getElementById('acc-'+k.toLowerCase()).value = acc[k] || '');
             document.getElementById('acc-form-title').innerText = "修改住宿人員";
             document.getElementById('acc-submit-btn').innerText = "儲存修改";
             document.getElementById('acc-cancel-btn').classList.remove('hidden');
@@ -1023,7 +1021,7 @@
         }
 
         function resetAllData() {
-            if (confirm("警告：這將清理現有數據並重置為範例，確定？")) { 
+            if (confirm("警告：這將清理現有數據並重置為空白版本，確定？")) { 
                 localStorage.removeItem(STORAGE_KEY); 
                 initApp(); 
             }
