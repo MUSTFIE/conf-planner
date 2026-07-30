@@ -22,7 +22,6 @@
     <style>
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        /* 確保表格在手機上不會過度擠壓 */
         td, th { white-space: nowrap; }
     </style>
 </head>
@@ -50,10 +49,10 @@
                 <!-- 系統工具按鈕 -->
                 <div class="flex items-center gap-2 text-[11px] sm:text-xs overflow-x-auto no-scrollbar pb-1 sm:pb-0">
                     <button onclick="exportData()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg border border-slate-700 transition flex items-center gap-1 whitespace-nowrap">
-                        📥 匯出
+                        📥 備份全系統 JSON
                     </button>
                     <label class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg border border-slate-700 transition cursor-pointer flex items-center gap-1 whitespace-nowrap">
-                        📤 匯入
+                        📤 還原
                         <input type="file" id="import-file" accept=".json" class="hidden" onchange="importData(event)">
                     </label>
                     <button onclick="resetAllData()" class="bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 px-3 py-2 rounded-lg transition whitespace-nowrap" title="重設為預設資料">
@@ -133,7 +132,11 @@
                     <h2 class="text-lg sm:text-xl font-bold text-slate-900">🎙️ 講者管理模組</h2>
                     <p class="text-slate-500 text-xs sm:text-sm mt-1">管理會議 Keynote / Invited Speaker 之物料收件。</p>
                 </div>
-                <input type="text" id="speaker-search" oninput="renderSpeakers()" placeholder="🔍 搜尋講者姓名、機構..." class="w-full md:w-64 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                <div class="flex items-center gap-3 w-full md:w-auto">
+                    <span id="sp-progress-badge" class="text-xs sm:text-sm font-bold bg-brand-50 text-brand-700 px-4 py-2 rounded-xl border border-brand-100 text-center">完成度: 0%</span>
+                    <button onclick="exportCSV('speakers')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition whitespace-nowrap">📥 匯出 CSV</button>
+                    <input type="text" id="speaker-search" oninput="renderSpeakers()" placeholder="🔍 搜尋..." class="w-full md:w-48 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                </div>
             </div>
 
             <!-- 新增 / 修改講者表單 -->
@@ -149,12 +152,15 @@
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">頭銜 (Title)</label>
-                        <select id="sp-title" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                        <select id="sp-title" onchange="handleTitleChange()" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white mb-2">
                             <option value="Chair Prof.">Chair Prof.</option>
                             <option value="Prof.">Prof.</option>
                             <option value="Dr.">Dr.</option>
-                            <option value="Mr./Ms.">Mr./Ms.</option>
+                            <option value="Mr.">Mr.</option>
+                            <option value="Ms.">Ms.</option>
+                            <option value="other">其他 (自訂...)</option>
                         </select>
+                        <input type="text" id="sp-title-custom" placeholder="請輸入自訂頭銜" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none hidden">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">職銜 / 職位 (Position)</label>
@@ -213,7 +219,8 @@
                 </div>
                 <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
                     <span id="acc-progress-badge" class="text-xs sm:text-sm font-bold bg-brand-50 text-brand-700 px-4 py-2 rounded-xl border border-brand-100 text-center">完成度: 0%</span>
-                    <input type="text" id="acc-search" oninput="renderAccommodation()" placeholder="🔍 搜尋姓名..." class="w-full md:w-64 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    <button onclick="exportCSV('accommodation')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition whitespace-nowrap">📥 匯出 CSV</button>
+                    <input type="text" id="acc-search" oninput="renderAccommodation()" placeholder="🔍 搜尋..." class="w-full md:w-48 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                 </div>
             </div>
 
@@ -269,6 +276,10 @@
                 <div>
                     <h2 class="text-lg sm:text-xl font-bold text-slate-900">💰 財務預算與核銷模組</h2>
                     <p class="text-slate-500 text-xs sm:text-sm mt-1">支援多幣別轉換、單價數量計算及付款狀態追蹤。</p>
+                </div>
+                <div class="flex items-center gap-3 w-full md:w-auto">
+                    <span id="fin-progress-badge" class="text-xs sm:text-sm font-bold bg-brand-50 text-brand-700 px-4 py-2 rounded-xl border border-brand-100 text-center">完成度: 0%</span>
+                    <button onclick="exportCSV('finance')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition whitespace-nowrap">📥 匯出 CSV</button>
                 </div>
             </div>
 
@@ -392,6 +403,7 @@
                 </div>
                 <div class="flex items-center gap-3">
                     <span id="gen-progress-badge" class="text-xs sm:text-sm font-bold bg-brand-50 text-brand-700 px-4 py-2 rounded-xl border border-brand-100">進度: 0%</span>
+                    <button onclick="exportCSV(activeTab)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition whitespace-nowrap">📥 匯出 CSV</button>
                 </div>
             </div>
 
@@ -399,7 +411,7 @@
             <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80">
                 <form id="form-generic" onsubmit="handleGenericSubmit(event)" class="flex flex-col sm:flex-row gap-3">
                     <input type="hidden" id="gen-item-id">
-                    <input type="text" id="gen-input-name" required placeholder="工作項目名稱..." class="flex-1 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    <input type="text" id="gen-input-name" required placeholder="工作項目內容..." class="flex-1 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                     <input type="text" id="gen-input-sub" placeholder="負責人或備註..." class="sm:w-64 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                     <div class="flex gap-2">
                         <button type="submit" id="gen-submit-btn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm px-6 py-3 rounded-xl shadow-sm transition shrink-0 flex-1 sm:flex-none">新增</button>
@@ -429,7 +441,7 @@
     </main>
 
     <script>
-        // 系統預設資料集（已清除所有預填項）
+        // 系統預設資料集
         const initialSchema = {
             summary: { title: "📊 會議總結" },
             speakers: {
@@ -458,21 +470,16 @@
         let db = {};
         let activeTab = 'summary';
 
-        // 取得 URL 參數以建立獨立的儲存空間
         const urlParams = new URLSearchParams(window.location.search);
         const eventId = urlParams.get('id') || 'default_event';
         const eventName = urlParams.get('name');
-        
-        // 每個活動會有自己獨立的 localStorage Key
         const STORAGE_KEY = `conf_app_db_${eventId}`;
 
         function initApp() {
-            // 若網址帶有名稱參數，則覆蓋原有標題
             if (eventName) {
                 document.getElementById('header-title').innerText = eventName;
                 document.title = `${eventName} - 籌備系統`;
             }
-
             loadDB();
             syncSpeakersToAccommodation();
             renderNav();
@@ -484,6 +491,11 @@
             if (stored) {
                 try { db = JSON.parse(stored); } catch(e) { db = JSON.parse(JSON.stringify(initialSchema)); }
             } else { db = JSON.parse(JSON.stringify(initialSchema)); }
+            
+            // 確保所有子模組皆具備 items 陣列
+            Object.keys(db).forEach(k => {
+                if (k !== 'summary' && !db[k].items) db[k].items = [];
+            });
         }
 
         function saveDB() {
@@ -497,18 +509,37 @@
 
             spItems.forEach(sp => {
                 const exist = accItems.find(a => a.speakerId === sp.id || (!a.isManual && a.name === sp.name));
-                // 只有當講者需要住宿(被勾選過)，或已經在清單中時，才同步過去
-                if (!exist && sp.tasks && sp.tasks.accommodation) {
-                    accItems.push({
-                        id: Date.now() + Math.floor(Math.random() * 1000), speakerId: sp.id, name: sp.name,
-                        engName: "", confirmationNo: "", booked: false, confirmed: false, isManual: false
-                    });
-                } else if (exist) {
-                    exist.speakerId = sp.id;
-                    if (!exist.isManual) exist.name = sp.name;
+                if (sp.tasks && sp.tasks.accommodation) {
+                    if (!exist) {
+                        accItems.push({
+                            id: Date.now() + Math.floor(Math.random() * 1000), speakerId: sp.id, name: sp.name,
+                            engName: "", confirmationNo: "", booked: false, confirmed: false, isManual: false
+                        });
+                    } else {
+                        exist.speakerId = sp.id;
+                        if (!exist.isManual) exist.name = sp.name;
+                    }
+                } else {
+                    if (exist && !exist.isManual) {
+                        const index = accItems.indexOf(exist);
+                        if (index > -1) accItems.splice(index, 1);
+                    }
                 }
             });
             saveDB();
+        }
+
+        function handleTitleChange() {
+            const select = document.getElementById('sp-title');
+            const customInput = document.getElementById('sp-title-custom');
+            if (select.value === 'other') {
+                customInput.classList.remove('hidden');
+                customInput.required = true;
+            } else {
+                customInput.classList.add('hidden');
+                customInput.required = false;
+                customInput.value = '';
+            }
         }
 
         function renderNav() {
@@ -582,8 +613,12 @@
                     });
                 } else if (key === 'accommodation') {
                     mod.items.forEach(a => { t += 2; if (a.booked) d++; if (a.confirmed) d++; });
+                } else if (key === 'finance') {
+                    t = mod.items.length;
+                    d = mod.items.filter(i => i.completed).length;
                 } else {
-                    t = mod.items.length; d = mod.items.filter(i => i.completed).length;
+                    t = mod.items.length;
+                    d = mod.items.filter(i => i.completed).length;
                 }
 
                 grandTotal += t; grandDone += d;
@@ -617,6 +652,7 @@
             document.getElementById('overall-task-count').innerText = `${grandDone} / ${grandTotal} 總工作項`;
         }
 
+        // --- 講者管理 ---
         function renderSpeakers() {
             const tbody = document.getElementById('table-speakers-body');
             tbody.innerHTML = '';
@@ -625,6 +661,15 @@
             const items = db.speakers.items.filter(s => 
                 s.name.toLowerCase().includes(filter) || (s.org && s.org.toLowerCase().includes(filter))
             );
+
+            let totalTasks = items.length * 7;
+            let completedTasks = 0;
+            items.forEach(s => {
+                const keys = ['invitation', 'photo', 'bio', 'abstract', 'idCard', 'accommodation', 'transport'];
+                keys.forEach(k => { if (s.tasks && s.tasks[k]) completedTasks++; });
+            });
+            const rate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+            document.getElementById('sp-progress-badge').innerText = `完成度: ${rate}% (${completedTasks}/${totalTasks})`;
 
             if (items.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="11" class="p-8 text-center text-slate-400">找不到講者資料。</td></tr>`;
@@ -639,7 +684,7 @@
                     const checked = sp.tasks && sp.tasks[k];
                     let extraUI = '';
                     if (k === 'accommodation' && checked) {
-                        extraUI = `<br><button onclick="switchTab('accommodation', '${escapeHtml(sp.name)}')" class="mt-1 text-[10px] text-brand-600 bg-brand-100/50 px-1.5 py-0.5 rounded hover:bg-brand-200 transition">🏨 前往住宿</button>`;
+                        extraUI = `<br><button onclick="switchTab('accommodation', '${escapeHtml(sp.name)}')" class="mt-1 text-[10px] text-brand-600 bg-brand-100/50 px-1.5 py-0.5 rounded hover:bg-brand-200 transition">🏨 住宿</button>`;
                     }
                     taskTds += `
                         <td class="p-3 text-center ${k === 'accommodation' ? 'bg-brand-50/30' : ''}">
@@ -694,8 +739,11 @@
         function handleSpeakerSubmit(e) {
             e.preventDefault();
             const editId = document.getElementById('sp-id').value;
+            const titleSelect = document.getElementById('sp-title').value;
+            const finalTitle = (titleSelect === 'other') ? document.getElementById('sp-title-custom').value.trim() : titleSelect;
+
             const payload = {
-                name: document.getElementById('sp-name').value.trim(), title: document.getElementById('sp-title').value,
+                name: document.getElementById('sp-name').value.trim(), title: finalTitle,
                 position: document.getElementById('sp-position').value.trim(), org: document.getElementById('sp-org').value.trim(),
                 email: document.getElementById('sp-email').value.trim(), identity: document.getElementById('sp-identity').value.trim()
             };
@@ -704,7 +752,7 @@
                 const sp = db.speakers.items.find(s => s.id == editId);
                 if (sp) Object.assign(sp, payload);
             } else {
-                db.speakers.items.push({ id: Date.now(), ...payload, tasks: { accommodation: true }, remark: "" });
+                db.speakers.items.push({ id: Date.now(), ...payload, tasks: { accommodation: false }, remark: "" });
             }
             saveDB(); syncSpeakersToAccommodation(); renderSpeakers(); resetSpeakerForm();
         }
@@ -713,7 +761,26 @@
             const sp = db.speakers.items.find(s => s.id === id);
             if (!sp) return;
             document.getElementById('sp-id').value = sp.id;
-            ['name','title','position','org','email','identity'].forEach(k => document.getElementById('sp-'+k).value = sp[k] || '');
+            document.getElementById('sp-name').value = sp.name || '';
+            document.getElementById('sp-position').value = sp.position || '';
+            document.getElementById('sp-org').value = sp.org || '';
+            document.getElementById('sp-email').value = sp.email || '';
+            document.getElementById('sp-identity').value = sp.identity || '';
+
+            const titleSelect = document.getElementById('sp-title');
+            const customInput = document.getElementById('sp-title-custom');
+            const standardOptions = ['Chair Prof.', 'Prof.', 'Dr.', 'Mr.', 'Ms.'];
+            
+            if (standardOptions.includes(sp.title)) {
+                titleSelect.value = sp.title;
+                customInput.classList.add('hidden');
+                customInput.value = '';
+            } else {
+                titleSelect.value = 'other';
+                customInput.classList.remove('hidden');
+                customInput.value = sp.title || '';
+            }
+
             document.getElementById('sp-form-title').innerText = "修改講者資料";
             document.getElementById('sp-submit-btn').innerText = "儲存修改";
             document.getElementById('sp-cancel-btn').classList.remove('hidden');
@@ -722,6 +789,7 @@
         function resetSpeakerForm() {
             document.getElementById('form-speaker').reset();
             document.getElementById('sp-id').value = '';
+            document.getElementById('sp-title-custom').classList.add('hidden');
             document.getElementById('sp-form-title').innerText = "新增講者資料";
             document.getElementById('sp-submit-btn').innerText = "儲存講者";
             document.getElementById('sp-cancel-btn').classList.add('hidden');
@@ -730,11 +798,11 @@
         function deleteSpeaker(id) {
             if (confirm("確定刪除此講者嗎？")) {
                 db.speakers.items = db.speakers.items.filter(s => s.id !== id);
-                saveDB(); renderSpeakers();
+                saveDB(); syncSpeakersToAccommodation(); renderSpeakers();
             }
         }
 
-        // --- 3. 住宿模組邏輯 ---
+        // --- 住宿模組 ---
         function renderAccommodation() {
             const tbody = document.getElementById('table-accommodation-body');
             tbody.innerHTML = '';
@@ -789,13 +857,6 @@
             const acc = db.accommodation.items.find(a => a.id === id);
             if (acc) {
                 acc[field] = !acc[field];
-                if (acc.speakerId) {
-                    const sp = db.speakers.items.find(s => s.id === acc.speakerId);
-                    if (sp) {
-                        if (!sp.tasks) sp.tasks = {};
-                        sp.tasks.accommodation = true;
-                    }
-                }
                 saveDB(); renderAccommodation();
             }
         }
@@ -842,7 +903,7 @@
             }
         }
 
-        // --- 4. 財務邏輯 ---
+        // --- 財務模組 ---
         function updateFinTotalCalc() {
             const [p, q, r] = ['price','qty','rate'].map(k => parseFloat(document.getElementById('fin-'+k).value) || (k==='qty'||k==='rate'?1:0));
             document.getElementById('fin-total').value = (p * q * r).toFixed(2);
@@ -853,11 +914,13 @@
             const [tInc, tExp] = [document.getElementById('table-finance-income'), document.getElementById('table-finance-expense')];
             tInc.innerHTML = ''; tExp.innerHTML = '';
             let [sumInc, sumExp] = [0, 0];
+            let completedCount = 0;
 
             items.forEach(item => {
                 const val = parseFloat(item.total) || 0;
                 const isInc = (item.type === 'income');
                 isInc ? (sumInc += val) : (sumExp += val);
+                if (item.completed) completedCount++;
 
                 const row = `
                     <tr class="hover:bg-slate-50/80 transition">
@@ -879,6 +942,9 @@
             if (tExp.innerHTML === '') tExp.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">尚無支出紀錄。</td></tr>`;
             document.getElementById('fin-income-subtotal').innerText = `總額: MOP ${sumInc.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
             document.getElementById('fin-expense-subtotal').innerText = `總額: MOP ${sumExp.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+            const finRate = items.length > 0 ? Math.round((completedCount / items.length) * 100) : 0;
+            document.getElementById('fin-progress-badge').innerText = `完成度: ${finRate}% (${completedCount}/${items.length})`;
         }
 
         function toggleFinItem(id) {
@@ -929,7 +995,7 @@
             if (confirm("確定刪除此筆財務項目？")) { db.finance.items = db.finance.items.filter(f => f.id !== id); saveDB(); renderFinance(); }
         }
 
-        // --- 5. 通用任務 ---
+        // --- 通用任務模組 ---
         function renderGenericModule(modKey) {
             const mod = db[modKey];
             document.getElementById('gen-module-title').innerText = mod.title;
@@ -941,7 +1007,7 @@
             const rate = items.length > 0 ? Math.round((dCount / items.length) * 100) : 0;
             document.getElementById('gen-progress-badge').innerText = `完成度: ${rate}% (${dCount}/${items.length})`;
 
-            if (items.length === 0) { tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-400">尚無工作任務。</td></tr>`; return; }
+            if (items.length === 0) { tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-400">尚無工作項目內容。</td></tr>`; return; }
 
             items.forEach(item => {
                 tbody.innerHTML += `
@@ -994,10 +1060,64 @@
         }
 
         function deleteGenericItem(modKey, id) {
-            if (confirm("確定刪除此任務？")) { db[modKey].items = db[modKey].items.filter(i => i.id !== id); saveDB(); renderGenericModule(modKey); }
+            if (confirm("確定刪除此項目？")) { db[modKey].items = db[modKey].items.filter(i => i.id !== id); saveDB(); renderGenericModule(modKey); }
         }
 
-        // --- 6. 系統工具 ---
+        // --- 匯出 CSV 共通邏輯 ---
+        function exportCSV(modKey) {
+            const mod = db[modKey];
+            if (!mod || !mod.items || mod.items.length === 0) {
+                alert("目前沒有資料可供匯出。");
+                return;
+            }
+
+            let csvContent = "\uFEFF"; // BOM for UTF-8 Excel support
+            let rows = [];
+
+            if (modKey === 'speakers') {
+                rows.push(["姓名", "頭銜", "職位", "機構", "電郵", "身分", "邀請函", "照片", "Bio", "摘要", "證件", "住宿", "交通", "備註"]);
+                mod.items.forEach(s => {
+                    const t = s.tasks || {};
+                    rows.push([
+                        s.name, s.title, s.position, s.org, s.email, s.identity,
+                        t.invitation ? 'V' : '', t.photo ? 'V' : '', t.bio ? 'V' : '',
+                        t.abstract ? 'V' : '', t.idCard ? 'V' : '', t.accommodation ? 'V' : '', t.transport ? 'V' : '',
+                        s.remark || ''
+                    ]);
+                });
+            } else if (modKey === 'accommodation') {
+                rows.push(["姓名", "英文姓名", "確認號", "已預訂", "已入住確認", "來源"]);
+                mod.items.forEach(a => {
+                    rows.push([a.name, a.engName, a.confirmationNo, a.booked ? '是' : '否', a.confirmed ? '是' : '否', a.isManual ? '手動新增' : '講者同步']);
+                });
+            } else if (modKey === 'finance') {
+                rows.push(["類型", "項目名稱", "幣別", "單價", "數量", "匯率", "MOP總價", "收付款方", "狀態"]);
+                mod.items.forEach(f => {
+                    rows.push([f.type === 'income' ? '收入' : '支出', f.name, f.currency, f.price, f.qty, f.rate, f.total, f.payer, f.completed ? '已結算' : '未結算']);
+                });
+            } else {
+                rows.push(["工作項目內容", "負責人/備註", "狀態"]);
+                mod.items.forEach(i => {
+                    rows.push([i.name, i.sub || '', i.completed ? '已完成' : '未完成']);
+                });
+            }
+
+            rows.forEach(row => {
+                const escaped = row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`);
+                csvContent += escaped.join(",") + "\r\n";
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = `${modKey}_export_${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+        }
+
+        // --- 系統資料工具 ---
         function exportData() {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db, null, 2));
             const anchor = document.createElement('a'); anchor.setAttribute("href", dataStr);
@@ -1013,7 +1133,7 @@
                 try {
                     const imported = JSON.parse(evt.target.result);
                     if (imported && imported.speakers && imported.finance) {
-                        db = imported; saveDB(); initApp(); alert("🎉 資料庫已成功匯入備份！");
+                        db = imported; saveDB(); initApp(); alert("🎉 資料庫已成功還原！");
                     } else { alert("⚠️ JSON 格式不符合。"); }
                 } catch(err) { alert("⚠️ 檔案讀取失敗，請確認是否為標準 JSON。"); }
             };
@@ -1021,7 +1141,7 @@
         }
 
         function resetAllData() {
-            if (confirm("警告：這將清理現有數據並重置為空白版本，確定？")) { 
+            if (confirm("警告：這將清理現有數據並重置為預設版本，確定？")) { 
                 localStorage.removeItem(STORAGE_KEY); 
                 initApp(); 
             }
