@@ -23,6 +23,14 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         td, th { white-space: nowrap; }
+        /* 確保導航欄在各裝置下自動適配與靈活換行/滾動 */
+        #nav-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans antialiased">
@@ -40,7 +48,7 @@
                     </div>
                     <div>
                         <h1 id="header-title" class="text-base sm:text-lg font-bold tracking-wide text-white flex items-center gap-2">
-                            工程會議籌備系統
+                            會議籌備系統
                         </h1>
                         <p class="text-[10px] sm:text-xs text-slate-400">Conference Management Platform</p>
                     </div>
@@ -61,8 +69,8 @@
                 </div>
             </div>
 
-            <!-- 動態模組分頁頁籤 -->
-            <nav id="nav-tabs" class="flex items-center gap-2 overflow-x-auto pt-2 pb-1 no-scrollbar border-t border-slate-800/80">
+            <!-- 動態模組分頁頁籤 (自動適配各裝置闊度) -->
+            <nav id="nav-tabs" class="pt-2 pb-1 border-t border-slate-800/80">
                 <!-- 由 JS 動態生成按鈕 -->
             </nav>
         </div>
@@ -394,7 +402,64 @@
             </div>
         </div>
 
-        <!-- 5. 通用任務清單模組 -->
+        <!-- 5. 交通安排模組 (已調整) -->
+        <div id="view-transport" class="tab-view hidden space-y-6">
+            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 class="text-lg sm:text-xl font-bold text-slate-900">🚗 交通安排模組</h2>
+                    <p class="text-slate-500 text-xs sm:text-sm mt-1">統計不同嘉賓的專車調派與詳細行程。</p>
+                </div>
+                <!-- 調整點 2：上方的總結位置除了顯示總嘉賓數，還要有總行程數及完成度 -->
+                <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                    <span id="trans-progress-badge" class="text-xs sm:text-sm font-bold bg-brand-50 text-brand-700 px-4 py-2 rounded-xl border border-brand-100 text-center">總嘉賓數: 0 | 總行程數: 0 | 完成度: 0%</span>
+                    <button onclick="exportCSV('transport')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition whitespace-nowrap">📥 匯出 CSV</button>
+                    <input type="text" id="trans-search" oninput="renderTransport()" placeholder="🔍 搜尋嘉賓..." class="w-full md:w-48 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                </div>
+            </div>
+
+            <!-- 新增/修改嘉賓交通安排表單 -->
+            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
+                <h3 id="trans-form-title" class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-brand-600"></span> 新增嘉賓交通檔案
+                </h3>
+                <form id="form-transport" onsubmit="handleTransportSubmit(event)" class="space-y-4">
+                    <input type="hidden" id="trans-id">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">嘉賓姓名 *</label>
+                            <input type="text" id="trans-guestname" required placeholder="例如：Prof. Alan Turing" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">總體備註</label>
+                            <input type="text" id="trans-remark" placeholder="例如：VIP 專車接送" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        </div>
+                    </div>
+
+                    <!-- 行程段落動態清單 -->
+                    <div class="border-t border-slate-100 pt-4 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <label class="text-xs font-bold text-slate-700 uppercase tracking-wider">行程明細 (可新增多筆：接機、送機、會場接送等)</label>
+                            <button type="button" onclick="addTransportLegRow()" class="bg-brand-50 hover:bg-brand-100 text-brand-600 text-xs font-semibold px-3 py-1.5 rounded-lg transition">+ 增加行程段落</button>
+                        </div>
+                        <div id="transport-legs-container" class="space-y-3">
+                            <!-- 動態插入行程列 -->
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button type="button" id="trans-cancel-btn" onclick="resetTransportForm()" class="hidden text-sm bg-slate-100 text-slate-700 py-2.5 px-5 rounded-xl">取消</button>
+                        <button type="submit" id="trans-submit-btn" class="text-sm bg-brand-600 text-white font-medium py-2.5 px-6 rounded-xl shadow-sm">儲存交通安排</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 交通安排總覽卡片清單 -->
+            <div id="transport-cards-list" class="space-y-4">
+                <!-- 動態生成各嘉賓的交通明細卡片 -->
+            </div>
+        </div>
+
+        <!-- 6. 通用任務清單模組 -->
         <div id="view-generic" class="tab-view hidden space-y-6">
             <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
@@ -459,11 +524,15 @@
                 desc: "精準追蹤會議收支、匯率折算與供應商結算狀態。",
                 items: []
             },
+            transport: {
+                title: "🚗 交通安排",
+                desc: "統計不同嘉賓的專車調派與詳細行程。",
+                items: []
+            },
             guests: { title: "🤝 嘉賓管理", desc: "邀請主禮嘉賓、校領導與學術界代表。", items: [] },
             venue: { title: "🏢 場地設備", desc: "會議廳、分會場教室與展覽區之劃分。", items: [] },
             catering: { title: "🍱 餐飲規劃", desc: "茶歇與晚宴準備。", items: [] },
             design: { title: "🎨 設計物料", desc: "主視覺、海報、手冊與名牌。", items: [] },
-            transport: { title: "🚗 交通接駁", desc: "機場接送與專車調派。", items: [] },
             pr: { title: "📢 公關徵稿", desc: "CFP 發布與新聞稿。", items: [] }
         };
 
@@ -482,6 +551,7 @@
             }
             loadDB();
             syncSpeakersToAccommodation();
+            syncSpeakersToTransport();
             renderNav();
             switchTab(activeTab);
         }
@@ -492,7 +562,6 @@
                 try { db = JSON.parse(stored); } catch(e) { db = JSON.parse(JSON.stringify(initialSchema)); }
             } else { db = JSON.parse(JSON.stringify(initialSchema)); }
             
-            // 確保所有子模組皆具備 items 陣列
             Object.keys(db).forEach(k => {
                 if (k !== 'summary' && !db[k].items) db[k].items = [];
             });
@@ -521,8 +590,36 @@
                     }
                 } else {
                     if (exist && !exist.isManual) {
-                        const index = accItems.indexOf(exist);
-                        if (index > -1) accItems.splice(index, 1);
+                        exist.speakerId = null; 
+                    }
+                }
+            });
+            saveDB();
+        }
+
+        function syncSpeakersToTransport() {
+            if (!db.speakers || !db.transport) return;
+            const spItems = db.speakers.items;
+            const transItems = db.transport.items;
+
+            spItems.forEach(sp => {
+                const exist = transItems.find(t => t.speakerId === sp.id || t.guestName === sp.name);
+                if (sp.tasks && sp.tasks.transport) {
+                    if (!exist) {
+                        transItems.push({
+                            id: Date.now() + Math.floor(Math.random() * 1000),
+                            speakerId: sp.id,
+                            guestName: sp.name,
+                            remark: "由講者模組自動同步",
+                            legs: []
+                        });
+                    } else {
+                        exist.speakerId = sp.id;
+                        if (!exist.guestName) exist.guestName = sp.name;
+                    }
+                } else {
+                    if (exist && exist.speakerId === sp.id) {
+                        exist.speakerId = null; 
                     }
                 }
             });
@@ -548,7 +645,7 @@
             Object.keys(db).forEach(key => {
                 const btn = document.createElement('button');
                 const isActive = (key === activeTab);
-                btn.className = `px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${
+                btn.className = `px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition flex items-center gap-1.5 flex-shrink-0 ${
                     isActive ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-400 bg-slate-800/30 hover:bg-slate-700 hover:text-white'
                 }`;
                 btn.innerHTML = `<span>${db[key].title}</span>`;
@@ -577,6 +674,11 @@
             } else if (tabKey === 'finance') {
                 document.getElementById('view-finance').classList.remove('hidden');
                 renderFinance();
+            } else if (tabKey === 'transport') {
+                document.getElementById('view-transport').classList.remove('hidden');
+                syncSpeakersToTransport();
+                if (filterQuery !== null) document.getElementById('trans-search').value = filterQuery;
+                renderTransport();
             } else {
                 document.getElementById('view-generic').classList.remove('hidden');
                 renderGenericModule(tabKey);
@@ -616,6 +718,15 @@
                 } else if (key === 'finance') {
                     t = mod.items.length;
                     d = mod.items.filter(i => i.completed).length;
+                } else if (key === 'transport') {
+                    mod.items.forEach(item => {
+                        if (item.legs && item.legs.length > 0) {
+                            t += item.legs.length;
+                            d += item.legs.filter(l => l.confirmed).length;
+                        } else {
+                            t += 1;
+                        }
+                    });
                 } else {
                     t = mod.items.length;
                     d = mod.items.filter(i => i.completed).length;
@@ -683,11 +794,27 @@
                 taskKeys.forEach(k => {
                     const checked = sp.tasks && sp.tasks[k];
                     let extraUI = '';
-                    if (k === 'accommodation' && checked) {
-                        extraUI = `<br><button onclick="switchTab('accommodation', '${escapeHtml(sp.name)}')" class="mt-1 text-[10px] text-brand-600 bg-brand-100/50 px-1.5 py-0.5 rounded hover:bg-brand-200 transition">🏨 住宿</button>`;
+                    if (k === 'accommodation') {
+                        const accRecord = db.accommodation.items.find(a => a.speakerId === sp.id || a.name === sp.name);
+                        const isAccConfirmed = accRecord && accRecord.booked && accRecord.confirmed;
+                        if (isAccConfirmed) {
+                            extraUI = `<br><span class="mt-1 inline-block text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">住宿已確認</span>`;
+                        } else if (checked) {
+                            extraUI = `<br><button onclick="switchTab('accommodation', '${escapeHtml(sp.name)}')" class="mt-1 text-[10px] text-brand-600 bg-brand-100/50 px-1.5 py-0.5 rounded hover:bg-brand-200 transition">🏨 住宿</button>`;
+                        }
+                    } else if (k === 'transport') {
+                        // 檢查交通安排中該嘉賓的所有行程是否皆已確認
+                        const transRecord = db.transport.items.find(t => t.speakerId === sp.id || t.guestName === sp.name);
+                        const isTransAllConfirmed = transRecord && transRecord.legs && transRecord.legs.length > 0 && transRecord.legs.every(l => l.confirmed);
+                        
+                        if (isTransAllConfirmed) {
+                            extraUI = `<br><span class="mt-1 inline-block text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">交通已確認</span>`;
+                        } else if (checked) {
+                            extraUI = `<br><button onclick="switchTab('transport', '${escapeHtml(sp.name)}')" class="mt-1 text-[10px] text-brand-600 bg-brand-100/50 px-1.5 py-0.5 rounded hover:bg-brand-200 transition">🚗 交通</button>`;
+                        }
                     }
                     taskTds += `
-                        <td class="p-3 text-center ${k === 'accommodation' ? 'bg-brand-50/30' : ''}">
+                        <td class="p-3 text-center ${k === 'accommodation' || k === 'transport' ? 'bg-brand-50/30' : ''}">
                             <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleSpeakerTask(${sp.id}, '${k}')" class="w-5 h-5 text-brand-600 rounded border-slate-300 cursor-pointer">
                             ${extraUI}
                         </td>
@@ -727,6 +854,7 @@
                 sp.tasks[key] = !sp.tasks[key];
                 saveDB();
                 if(key === 'accommodation') syncSpeakersToAccommodation();
+                if(key === 'transport') syncSpeakersToTransport();
                 renderSpeakers();
             }
         }
@@ -752,9 +880,9 @@
                 const sp = db.speakers.items.find(s => s.id == editId);
                 if (sp) Object.assign(sp, payload);
             } else {
-                db.speakers.items.push({ id: Date.now(), ...payload, tasks: { accommodation: false }, remark: "" });
+                db.speakers.items.push({ id: Date.now(), ...payload, tasks: { accommodation: false, transport: false }, remark: "" });
             }
-            saveDB(); syncSpeakersToAccommodation(); renderSpeakers(); resetSpeakerForm();
+            saveDB(); syncSpeakersToAccommodation(); syncSpeakersToTransport(); renderSpeakers(); resetSpeakerForm();
         }
 
         function editSpeaker(id) {
@@ -798,7 +926,7 @@
         function deleteSpeaker(id) {
             if (confirm("確定刪除此講者嗎？")) {
                 db.speakers.items = db.speakers.items.filter(s => s.id !== id);
-                saveDB(); syncSpeakersToAccommodation(); renderSpeakers();
+                saveDB(); syncSpeakersToAccommodation(); syncSpeakersToTransport(); renderSpeakers();
             }
         }
 
@@ -857,7 +985,28 @@
             const acc = db.accommodation.items.find(a => a.id === id);
             if (acc) {
                 acc[field] = !acc[field];
-                saveDB(); renderAccommodation();
+                
+                if (acc.speakerId) {
+                    const sp = db.speakers.items.find(s => s.id === acc.speakerId);
+                    if (sp) {
+                        if (!sp.tasks) sp.tasks = {};
+                        if (acc.booked && acc.confirmed) {
+                            sp.tasks.accommodation = true;
+                        }
+                    }
+                } else if (!acc.isManual) {
+                    const sp = db.speakers.items.find(s => s.name === acc.name);
+                    if (sp) {
+                        acc.speakerId = sp.id;
+                        if (!sp.tasks) sp.tasks = {};
+                        if (acc.booked && acc.confirmed) {
+                            sp.tasks.accommodation = true;
+                        }
+                    }
+                }
+                
+                saveDB(); 
+                renderAccommodation();
             }
         }
 
@@ -995,6 +1144,272 @@
             if (confirm("確定刪除此筆財務項目？")) { db.finance.items = db.finance.items.filter(f => f.id !== id); saveDB(); renderFinance(); }
         }
 
+        // --- 交通安排模組 ---
+        function addTransportLegRow(data = {}) {
+            const container = document.getElementById('transport-legs-container');
+            const rowId = 'leg_' + Date.now() + Math.floor(Math.random() * 1000);
+            const html = `
+                <div id="${rowId}" class="transport-leg-row bg-slate-50 p-3.5 rounded-xl border border-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 mb-0.5">日期</label>
+                        <input type="date" class="leg-date w-full border border-slate-200 rounded-lg p-2 text-xs bg-white" value="${escapeHtml(data.date || '')}">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 mb-0.5">時間</label>
+                        <input type="time" class="leg-time w-full border border-slate-200 rounded-lg p-2 text-xs bg-white" value="${escapeHtml(data.time || '')}">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 mb-0.5">起點</label>
+                        <input type="text" class="leg-from w-full border border-slate-200 rounded-lg p-2 text-xs bg-white" placeholder="例如：機場" value="${escapeHtml(data.from || '')}">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 mb-0.5">終點</label>
+                        <input type="text" class="leg-to w-full border border-slate-200 rounded-lg p-2 text-xs bg-white" placeholder="例如：酒店" value="${escapeHtml(data.to || '')}">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-500 mb-0.5">乘車人數</label>
+                        <input type="number" min="1" class="leg-passengers w-full border border-slate-200 rounded-lg p-2 text-xs bg-white" placeholder="1" value="${escapeHtml(data.passengers || '1')}">
+                    </div>
+                    <div class="flex justify-end">
+                        <button type="button" onclick="this.closest('.transport-leg-row').remove()" class="bg-rose-50 hover:bg-rose-100 text-rose-600 px-3 py-2 rounded-lg text-xs font-semibold transition w-full sm:w-auto">刪除行程</button>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', html);
+        }
+
+        function renderTransport() {
+            const listContainer = document.getElementById('transport-cards-list');
+            listContainer.innerHTML = '';
+            const filter = (document.getElementById('trans-search').value || '').toLowerCase();
+            const items = db.transport.items.filter(item => item.guestName.toLowerCase().includes(filter));
+
+            // 計算總嘉賓數、總行程數與完成度
+            const totalGuests = db.transport.items.length;
+            let totalLegs = 0;
+            let completedLegs = 0;
+            db.transport.items.forEach(item => {
+                if (item.legs && item.legs.length > 0) {
+                    totalLegs += item.legs.length;
+                    completedLegs += item.legs.filter(l => l.confirmed).length;
+                }
+            });
+            const transRate = totalLegs > 0 ? Math.round((completedLegs / totalLegs) * 100) : 0;
+
+            document.getElementById('trans-progress-badge').innerText = `總嘉賓數: ${totalGuests} | 總行程數: ${totalLegs} | 完成度: ${transRate}%`;
+
+            if (items.length === 0) {
+                listContainer.innerHTML = `<div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200/80 text-center text-slate-400">目前尚無嘉賓交通安排紀錄。</div>`;
+                return;
+            }
+
+            items.forEach(item => {
+                let legsHtml = '';
+                if (item.legs && item.legs.length > 0) {
+                    item.legs.forEach((leg, idx) => {
+                        legsHtml += `
+                            <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
+                                <td class="p-3 text-xs font-bold text-brand-600 align-middle">行程 #${idx + 1}</td>
+                                <td class="p-3 text-xs text-slate-700 align-middle">📅 ${escapeHtml(leg.date || '-')} <br>⏰ ${escapeHtml(leg.time || '-')}</td>
+                                <td class="p-3 text-xs font-medium text-slate-800 align-middle">🚩 <b>起:</b> ${escapeHtml(leg.from || '-')}<br>🏁 <b>迄:</b> ${escapeHtml(leg.to || '-')}</td>
+                                <td class="p-3 text-xs font-semibold text-slate-700 text-center align-middle">👥 ${escapeHtml(leg.passengers || '1')} 人</td>
+                                <td class="p-3 align-middle">
+                                    <div class="space-y-2 w-56 sm:w-64 bg-slate-50/80 p-2.5 rounded-xl border border-slate-200">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-[11px] font-semibold text-slate-600 w-14 shrink-0">車牌號碼</span>
+                                            <input type="text" value="${escapeHtml(leg.plate || '')}" onchange="updateLegField(${item.id}, ${idx}, 'plate', this.value)" placeholder="請輸入車牌" class="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none focus:border-brand-500">
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-[11px] font-semibold text-slate-600 w-14 shrink-0">司機姓名</span>
+                                            <input type="text" value="${escapeHtml(leg.driverName || '')}" onchange="updateLegField(${item.id}, ${idx}, 'driverName', this.value)" placeholder="請輸入司機姓名" class="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none focus:border-brand-500">
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-[11px] font-semibold text-slate-600 w-14 shrink-0">聯絡電話</span>
+                                            <input type="text" value="${escapeHtml(leg.driverPhone || '')}" onchange="updateLegField(${item.id}, ${idx}, 'driverPhone', this.value)" placeholder="請輸入電話" class="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none focus:border-brand-500">
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="p-3 text-center align-middle">
+                                    <input type="checkbox" ${leg.confirmed ? 'checked' : ''} onchange="toggleLegConfirmed(${item.id}, ${idx})" class="w-5 h-5 text-brand-600 rounded border-slate-300 cursor-pointer">
+                                </td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    legsHtml = `<tr><td colspan="6" class="p-4 text-center text-xs text-slate-400">尚無詳細交通行程段落。</td></tr>`;
+                }
+
+                listContainer.innerHTML += `
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3">
+                            <div>
+                                <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
+                                    👤 ${escapeHtml(item.guestName)}
+                                </h3>
+                                <p class="text-xs text-slate-500 mt-0.5">備註：${escapeHtml(item.remark || '無')}</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="editTransport(${item.id})" class="text-brand-600 hover:text-brand-800 bg-brand-50 font-medium px-3 py-1.5 rounded-lg text-xs transition">修改安排</button>
+                                <button onclick="deleteTransport(${item.id})" class="text-rose-600 hover:text-rose-800 bg-rose-50 font-medium px-3 py-1.5 rounded-lg text-xs transition">刪除嘉賓</button>
+                            </div>
+                        </div>
+
+                        <!-- 該嘉賓的交通行程總結表 -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-50/70 text-slate-400 text-[11px] uppercase tracking-wider font-semibold">
+                                        <th class="p-3">序號</th>
+                                        <th class="p-3">日期與時間</th>
+                                        <th class="p-3">起點與終點</th>
+                                        <th class="p-3 text-center">乘車人數</th>
+                                        <th class="p-3">車牌 / 司機 / 電話 (行程總結表輸入)</th>
+                                        <th class="p-3 text-center">行程確認</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${legsHtml}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // 即時更新特定行程段落的車牌/司機/電話欄位
+        function updateLegField(itemId, legIndex, field, val) {
+            const item = db.transport.items.find(i => i.id === itemId);
+            if (item && item.legs && item.legs[legIndex]) {
+                item.legs[legIndex][field] = val.trim();
+                saveDB();
+            }
+        }
+
+        // 切換特定嘉賓特定行程段落的確認狀態 (並同步更新講者模組)
+        function toggleLegConfirmed(itemId, legIndex) {
+            const item = db.transport.items.find(i => i.id === itemId);
+            if (item && item.legs && item.legs[legIndex]) {
+                item.legs[legIndex].confirmed = !item.legs[legIndex].confirmed;
+                
+                // 檢查是否該嘉賓的所有行程都已確認
+                const allConfirmed = item.legs.length > 0 && item.legs.every(l => l.confirmed);
+                
+                // 同步更新至對應的講者模組
+                if (item.speakerId) {
+                    const sp = db.speakers.items.find(s => s.id === item.speakerId);
+                    if (sp) {
+                        if (!sp.tasks) sp.tasks = {};
+                        sp.tasks.transport = allConfirmed;
+                    }
+                } else {
+                    const sp = db.speakers.items.find(s => s.name === item.guestName);
+                    if (sp) {
+                        item.speakerId = sp.id;
+                        if (!sp.tasks) sp.tasks = {};
+                        sp.tasks.transport = allConfirmed;
+                    }
+                }
+
+                saveDB();
+                renderTransport();
+            }
+        }
+
+        function handleTransportSubmit(e) {
+            e.preventDefault();
+            const editId = document.getElementById('trans-id').value;
+            const guestName = document.getElementById('trans-guestname').value.trim();
+            const remark = document.getElementById('trans-remark').value.trim();
+
+            const legRows = document.querySelectorAll('.transport-leg-row');
+            
+            const existingItem = editId ? db.transport.items.find(i => i.id == editId) : null;
+
+            const legs = [];
+            legRows.forEach((row, idx) => {
+                const oldLeg = (existingItem && existingItem.legs && existingItem.legs[idx]) ? existingItem.legs[idx] : {};
+                legs.push({
+                    date: row.querySelector('.leg-date').value.trim(),
+                    time: row.querySelector('.leg-time').value.trim(),
+                    from: row.querySelector('.leg-from').value.trim(),
+                    to: row.querySelector('.leg-to').value.trim(),
+                    passengers: row.querySelector('.leg-passengers').value.trim(),
+                    plate: oldLeg.plate || '',
+                    driverName: oldLeg.driverName || '',
+                    driverPhone: oldLeg.driverPhone || '',
+                    confirmed: oldLeg.confirmed || false
+                });
+            });
+
+            if (editId) {
+                const item = db.transport.items.find(i => i.id == editId);
+                if (item) {
+                    item.guestName = guestName;
+                    item.remark = remark;
+                    item.legs = legs;
+                }
+            } else {
+                db.transport.items.push({
+                    id: Date.now(),
+                    guestName,
+                    remark,
+                    legs
+                });
+            }
+
+            saveDB();
+            renderTransport();
+            resetTransportForm();
+        }
+
+        function editTransport(id) {
+            const item = db.transport.items.find(i => i.id === id);
+            if (!item) return;
+
+            document.getElementById('trans-id').value = item.id;
+            document.getElementById('trans-guestname').value = item.guestName || '';
+            document.getElementById('trans-remark').value = item.remark || '';
+
+            const container = document.getElementById('transport-legs-container');
+            container.innerHTML = '';
+            if (item.legs && item.legs.length > 0) {
+                item.legs.forEach(leg => addTransportLegRow(leg));
+            } else {
+                addTransportLegRow();
+            }
+
+            document.getElementById('trans-form-title').innerText = "修改嘉賓交通安排";
+            document.getElementById('trans-submit-btn').innerText = "儲存修改";
+            document.getElementById('trans-cancel-btn').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function resetTransportForm() {
+            document.getElementById('form-transport').reset();
+            document.getElementById('trans-id').value = '';
+            document.getElementById('transport-legs-container').innerHTML = '';
+            addTransportLegRow();
+            document.getElementById('trans-form-title').innerText = "新增嘉賓交通檔案";
+            document.getElementById('trans-submit-btn').innerText = "儲存交通安排";
+            document.getElementById('trans-cancel-btn').classList.add('hidden');
+        }
+
+        function deleteTransport(id) {
+            if (confirm("確定刪除此位嘉賓的交通安排資料嗎？")) {
+                db.transport.items = db.transport.items.filter(i => i.id !== id);
+                saveDB();
+                renderTransport();
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initApp();
+            if(document.getElementById('transport-legs-container') && document.getElementById('transport-legs-container').children.length === 0) {
+                addTransportLegRow();
+            }
+        });
+
         // --- 通用任務模組 ---
         function renderGenericModule(modKey) {
             const mod = db[modKey];
@@ -1071,7 +1486,7 @@
                 return;
             }
 
-            let csvContent = "\uFEFF"; // BOM for UTF-8 Excel support
+            let csvContent = "\uFEFF"; 
             let rows = [];
 
             if (modKey === 'speakers') {
@@ -1095,6 +1510,17 @@
                 mod.items.forEach(f => {
                     rows.push([f.type === 'income' ? '收入' : '支出', f.name, f.currency, f.price, f.qty, f.rate, f.total, f.payer, f.completed ? '已結算' : '未結算']);
                 });
+            } else if (modKey === 'transport') {
+                rows.push(["嘉賓姓名", "總體備註", "行程序號", "日期", "時間", "起點", "終點", "乘車人數", "車牌號碼", "司機姓名", "司機電話", "行程確認"]);
+                mod.items.forEach(item => {
+                    if (item.legs && item.legs.length > 0) {
+                        item.legs.forEach((leg, idx) => {
+                            rows.push([item.guestName, item.remark || '', idx + 1, leg.date, leg.time, leg.from, leg.to, leg.passengers, leg.plate, leg.driverName, leg.driverPhone, leg.confirmed ? '已確認' : '未確認']);
+                        });
+                    } else {
+                        rows.push([item.guestName, item.remark || '', '無行程', '', '', '', '', '', '', '', '', '']);
+                    }
+                });
             } else {
                 rows.push(["工作項目內容", "負責人/備註", "狀態"]);
                 mod.items.forEach(i => {
@@ -1117,7 +1543,6 @@
             anchor.remove();
         }
 
-        // --- 系統資料工具 ---
         function exportData() {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db, null, 2));
             const anchor = document.createElement('a'); anchor.setAttribute("href", dataStr);
@@ -1148,8 +1573,6 @@
         }
 
         function escapeHtml(str) { return String(str||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-
-        window.addEventListener('DOMContentLoaded', () => initApp());
     </script>
 </body>
 </html>
