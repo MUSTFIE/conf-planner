@@ -20,10 +20,14 @@
             <h2 id="form-title" class="text-xl font-semibold mb-4">新增學術會議</h2>
             <form id="add-event-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <input type="hidden" id="event-id">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">活動名稱 <span class="text-red-500">*</span></label>
-                    <input type="text" id="event-name" required class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                </div>
+<div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">活動中文名稱 <span class="text-red-500">*</span></label>
+    <input type="text" id="event-name-zh" required class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+</div>
+<div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">活動英文名稱 <span class="text-red-500">*</span></label>
+    <input type="text" id="event-name-en" required class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+</div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">會議日期 <span class="text-red-500">*</span></label>
                     <div class="grid grid-cols-2 gap-2">
@@ -42,11 +46,11 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">負責部門 <span class="text-gray-400 text-xs">(選填)</span></label>
-                    <input type="text" id="event-department" placeholder="例如：教務處、研發處" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <input type="text" id="event-department" placeholder="例如：計算機科學與工程學院" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">會議地點 <span class="text-gray-400 text-xs">(選填)</span></label>
-                    <input type="text" id="event-location" placeholder="例如：台大管理學院國際會議廳" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <input type="text" id="event-location" placeholder="例如：澳科N101" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
                 </div>
                 <div class="md:col-span-2 flex gap-2">
                     <button type="submit" id="submit-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition">
@@ -112,7 +116,9 @@
         form.addEventListener("submit", (e) => {
             e.preventDefault();
             const id = eventIdInput.value;
-            const name = document.getElementById("event-name").value;
+            const nameZh = document.getElementById("event-name-zh").value;
+const nameEn = document.getElementById("event-name-en").value;
+const name = `${nameZh} (${nameEn})`;
             const startDate = document.getElementById("event-start-date").value;
             const endDate = document.getElementById("event-end-date").value;
             const academicLead = document.getElementById("event-academic-lead").value;
@@ -276,7 +282,8 @@
                 item.querySelector(".edit-btn").addEventListener("click", (e) => {
                     e.stopPropagation();
                     eventIdInput.value = key;
-                    document.getElementById("event-name").value = event.name || "";
+                    document.getElementById("event-name-zh").value = event.name || "";
+document.getElementById("event-name-en").value = "";
                     document.getElementById("event-start-date").value = event.startDate || (event.date && !event.date.includes("~") ? event.date : "") || "";
                     document.getElementById("event-end-date").value = event.endDate || "";
                     document.getElementById("event-academic-lead").value = event.academicLead || "";
