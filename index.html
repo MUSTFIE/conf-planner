@@ -10,56 +10,56 @@
 <body class="bg-gray-50 text-gray-800">
 
     <!-- 主系統內容容器 (直接顯示) -->
-    <div id="main-app" class="max-w-4xl mx-auto p-6">
-        <header class="mb-8 flex justify-between items-center">
-            <h1 class="text-3xl font-bold text-blue-600">學術會議籌備管理</h1>
+    <div id="main-app" class="max-w-4xl mx-auto p-4 sm:p-6">
+        <header class="mb-6 sm:mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <h1 class="text-2xl sm:text-3xl font-bold text-blue-600">學術會議籌備管理</h1>
             <div class="flex items-center gap-3">
                 <span id="sync-status" class="text-sm text-gray-500">連線中...</span>
             </div>
         </header>
 
         <!-- 新增/編輯活動表單 -->
-        <section class="bg-white p-6 rounded-xl shadow-md mb-8">
-            <h2 id="form-title" class="text-xl font-semibold mb-4">新增學術會議</h2>
+        <section class="bg-white p-4 sm:p-6 rounded-xl shadow-md mb-8">
+            <h2 id="form-title" class="text-lg sm:text-xl font-semibold mb-4">新增學術會議</h2>
             <form id="add-event-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <input type="hidden" id="event-id">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">活動中文名稱 <span class="text-gray-400 text-xs">(中英擇一必填)</span></label>
-                    <input type="text" id="event-name-zh" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <input type="text" id="event-name-zh" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:outline-none">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">活動英文名稱 <span class="text-gray-400 text-xs">(中英擇一必填)</span></label>
-                    <input type="text" id="event-name-en" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <input type="text" id="event-name-en" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:outline-none">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">會議日期 <span class="text-red-500">*</span></label>
-                    <div class="grid grid-cols-2 gap-2">
-                        <input type="date" id="event-start-date" required class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" title="開始日期">
-                        <input type="date" id="event-end-date" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" title="結束日期 (若為單日可不填)">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <input type="date" id="event-start-date" required class="w-full border border-gray-300 rounded-lg p-2.5 text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:outline-none" title="開始日期">
+                        <input type="date" id="event-end-date" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:outline-none" title="結束日期 (若為單日可不填)">
                     </div>
                     <span class="text-gray-400 text-xs mt-1 block">若為多日會議請填寫起訖日，單日僅填左側即可</span>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">學術負責人 <span class="text-gray-400 text-xs">(選填)</span></label>
-                    <input type="text" id="event-academic-lead" placeholder="例如：張教授" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <input type="text" id="event-academic-lead" placeholder="例如：張教授" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:outline-none">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">行政負責人 <span class="text-gray-400 text-xs">(選填)</span></label>
-                    <input type="text" id="event-admin-lead" placeholder="例如：李專員" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <input type="text" id="event-admin-lead" placeholder="例如：李專員" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:outline-none">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">負責部門 <span class="text-gray-400 text-xs">(選填)</span></label>
-                    <input type="text" id="event-department" placeholder="例如：計算機科學與工程學院" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <input type="text" id="event-department" placeholder="例如：計算機科學與工程學院" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:outline-none">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">會議地點 <span class="text-gray-400 text-xs">(選填)</span></label>
-                    <input type="text" id="event-location" placeholder="例如：澳科N101" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <input type="text" id="event-location" placeholder="例如：澳科N101" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:outline-none">
                 </div>
-                <div class="md:col-span-2 flex gap-2">
-                    <button type="submit" id="submit-btn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition">
+                <div class="md:col-span-2 flex flex-col sm:flex-row gap-2 pt-2">
+                    <button type="submit" id="submit-btn" class="w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition text-sm sm:text-base">
                         新增活動
                     </button>
-                    <button type="button" id="cancel-edit-btn" class="hidden bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2.5 px-4 rounded-lg transition">
+                    <button type="button" id="cancel-edit-btn" class="hidden w-full sm:w-auto bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2.5 px-4 rounded-lg transition text-sm sm:text-base">
                         取消編輯
                     </button>
                 </div>
@@ -69,15 +69,15 @@
         <!-- 活動列表 -->
         <section>
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
-                <h2 class="text-xl font-semibold">現有會議列表</h2>
-                <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-lg sm:text-xl font-semibold">現有會議列表</h2>
+                <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
                     <!-- 導出 CSV 按鈕 -->
-                    <button type="button" id="export-csv-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm">
+                    <button type="button" id="export-csv-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-medium px-3.5 py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm">
                         📥 導出 CSV
                     </button>
                     <div class="flex items-center gap-2">
-                        <label for="sort-order" class="text-sm text-gray-600 font-medium">排序：</label>
-                        <select id="sort-order" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                        <label for="sort-order" class="text-xs sm:text-sm text-gray-600 font-medium whitespace-nowrap">排序：</label>
+                        <select id="sort-order" class="border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
                             <option value="asc">日期由近到遠</option>
                             <option value="desc">日期由遠到近</option>
                         </select>
@@ -86,7 +86,7 @@
             </div>
             <div id="event-list" class="flex flex-col gap-3">
                 <!-- 動態載入會議列表 -->
-                <p class="text-gray-500">載入中...</p>
+                <p class="text-gray-500 text-sm">載入中...</p>
             </div>
         </section>
     </div>
@@ -197,7 +197,7 @@
             eventIdInput.value = "";
             formTitle.textContent = "新增學術會議";
             submitBtn.textContent = "新增活動";
-            submitBtn.className = "flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition";
+            submitBtn.className = "w-full sm:flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition text-sm sm:text-base";
             cancelEditBtn.classList.add("hidden");
         }
 
@@ -208,7 +208,7 @@
             renderEventList(data);
         }, (error) => {
             console.error(error);
-            eventListEl.innerHTML = `<p class="text-red-500">讀取資料失敗，請確認 Firebase Rules 權限與連線設定。</p>`;
+            eventListEl.innerHTML = `<p class="text-red-500 text-sm">讀取資料失敗，請確認 Firebase Rules 權限與連線設定。</p>`;
         });
 
         // 導出 CSV 功能
@@ -219,8 +219,7 @@
                 return;
             }
 
-            // CSV 標頭
-            let csvContent = "\uFEFF"; // 加入 BOM 避免中文亂碼
+            let csvContent = "\uFEFF"; 
             csvContent += "會議名稱,日期,負責部門,會議地點,學術負責人,行政負責人,進度百分比\n";
 
             Object.keys(data).forEach((key) => {
@@ -230,7 +229,6 @@
                 const completedTasks = tasks.filter(t => t.completed).length;
                 const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-                // 欄位內容包雙引號以防內容含有逗號
                 const name = `"${(event.name || "").replace(/"/g, '""')}"`;
                 const date = `"${(event.date || "").replace(/"/g, '""')}"`;
                 const department = `"${(event.department || "未填寫").replace(/"/g, '""')}"`;
@@ -242,7 +240,6 @@
                 csvContent += `${name},${date},${department},${location},${academicLead},${adminLead},${progressStr}\n`;
             });
 
-            // 建立下載連結
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -257,7 +254,7 @@
             eventListEl.innerHTML = "";
 
             if (!data) {
-                eventListEl.innerHTML = `<p class="text-gray-500">目前沒有會議，請在上方新增。</p>`;
+                eventListEl.innerHTML = `<p class="text-gray-500 text-sm">目前沒有會議，請在上方新增。</p>`;
                 return;
             }
 
@@ -276,61 +273,63 @@
 
             eventKeys.forEach((key) => {
                 const event = data[key];
+                
+                // 修正：確實從資料中計算子任務進度
                 const tasks = event.tasks ? Object.values(event.tasks) : [];
                 const totalTasks = tasks.length;
                 const completedTasks = tasks.filter(t => t.completed).length;
                 const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
                 const item = document.createElement("div");
-                item.className = "bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4";
+                item.className = "bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4";
                 
                 const departmentHtml = event.department 
-                    ? `<span class="inline-flex items-center text-gray-800 bg-gray-100 px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200">🏢 部門：${escapeHtml(event.department)}</span>` 
-                    : `<span class="inline-flex items-center text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg text-sm font-medium border border-dashed border-gray-200">🏢 部門：未填寫</span>`;
+                    ? `<span class="inline-flex items-center text-gray-800 bg-gray-100 px-2.5 py-1 rounded-md text-xs sm:text-sm font-medium border border-gray-200">🏢 部門：${escapeHtml(event.department)}</span>` 
+                    : `<span class="inline-flex items-center text-gray-400 bg-gray-50 px-2.5 py-1 rounded-md text-xs sm:text-sm font-medium border border-dashed border-gray-200">🏢 部門：未填寫</span>`;
 
                 const locationHtml = event.location 
-                    ? `<span class="inline-flex items-center text-gray-800 bg-blue-50 px-3 py-1.5 rounded-lg text-sm font-medium border border-blue-100">📍 地點：${escapeHtml(event.location)}</span>` 
-                    : `<span class="inline-flex items-center text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg text-sm font-medium border border-dashed border-gray-200">📍 地點：未填寫</span>`;
+                    ? `<span class="inline-flex items-center text-gray-800 bg-blue-50 px-2.5 py-1 rounded-md text-xs sm:text-sm font-medium border border-blue-100">📍 地點：${escapeHtml(event.location)}</span>` 
+                    : `<span class="inline-flex items-center text-gray-400 bg-gray-50 px-2.5 py-1 rounded-md text-xs sm:text-sm font-medium border border-dashed border-gray-200">📍 地點：未填寫</span>`;
                 
                 const academicHtml = event.academicLead 
-                    ? `<span class="inline-flex items-center text-gray-800 bg-indigo-50 px-3 py-1.5 rounded-lg text-sm font-medium border border-indigo-100">🎓 學術：${escapeHtml(event.academicLead)}</span>` 
-                    : `<span class="inline-flex items-center text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg text-sm font-medium border border-dashed border-gray-200">🎓 學術：未填寫</span>`;
+                    ? `<span class="inline-flex items-center text-gray-800 bg-indigo-50 px-2.5 py-1 rounded-md text-xs sm:text-sm font-medium border border-indigo-100">🎓 學術：${escapeHtml(event.academicLead)}</span>` 
+                    : `<span class="inline-flex items-center text-gray-400 bg-gray-50 px-2.5 py-1 rounded-md text-xs sm:text-sm font-medium border border-dashed border-gray-200">🎓 學術：未填寫</span>`;
                 
                 const adminHtml = event.adminLead 
-                    ? `<span class="inline-flex items-center text-gray-800 bg-emerald-50 px-3 py-1.5 rounded-lg text-sm font-medium border border-emerald-100">📋 行政：${escapeHtml(event.adminLead)}</span>` 
-                    : `<span class="inline-flex items-center text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg text-sm font-medium border border-dashed border-gray-200">📋 行政：未填寫</span>`;
+                    ? `<span class="inline-flex items-center text-gray-800 bg-emerald-50 px-2.5 py-1 rounded-md text-xs sm:text-sm font-medium border border-emerald-100">📋 行政：${escapeHtml(event.adminLead)}</span>` 
+                    : `<span class="inline-flex items-center text-gray-400 bg-gray-50 px-2.5 py-1 rounded-md text-xs sm:text-sm font-medium border border-dashed border-gray-200">📋 行政：未填寫</span>`;
 
                 item.innerHTML = `
                     <div class="flex-1 cursor-pointer w-full" data-detail-id="${key}">
-                        <div class="flex flex-wrap items-center gap-2 mb-3">
-                            <h3 class="text-lg font-bold text-gray-800">${escapeHtml(event.name)}</h3>
-                            <span class="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-full font-semibold border border-blue-100">📅 ${event.date}</span>
+                        <div class="flex flex-wrap items-center gap-2 mb-2 sm:mb-3">
+                            <h3 class="text-base sm:text-lg font-bold text-gray-800">${escapeHtml(event.name)}</h3>
+                            <span class="text-xs bg-blue-50 text-blue-600 px-2.5 py-0.5 sm:py-1 rounded-full font-semibold border border-blue-100">📅 ${event.date}</span>
                         </div>
-                        <div class="flex flex-wrap gap-2.5">
+                        <div class="flex flex-wrap gap-2">
                             ${departmentHtml}
                             ${locationHtml}
                             ${academicHtml}
                             ${adminHtml}
                         </div>
                     </div>
-                    <div class="flex items-center gap-5 w-full md:w-auto justify-between md:justify-end border-t md:border-t-0 pt-3 md:pt-0 border-gray-100">
-                        <div class="w-28">
+                    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full md:w-auto justify-between border-t md:border-t-0 pt-3 md:pt-0 border-gray-100">
+                        <div class="w-full sm:w-28">
                             <div class="flex justify-between text-xs font-medium text-gray-600 mb-1">
                                 <span>進度</span>
                                 <span>${progress}%</span>
                             </div>
                             <div class="w-full bg-gray-200 rounded-full h-2">
-                                <div class="bg-blue-600 h-2 rounded-full" style="width: ${progress}%"></div>
+                                <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: ${progress}%"></div>
                             </div>
                         </div>
-                        <div class="flex gap-2">
-                            <button type="button" class="edit-btn px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition" data-id="${key}">
+                        <div class="flex items-center justify-end gap-2">
+                            <button type="button" class="edit-btn px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs sm:text-sm font-medium rounded-lg transition">
                                 編輯
                             </button>
-                            <button type="button" class="detail-btn px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm font-medium rounded-lg transition" data-detail-id="${key}">
+                            <button type="button" class="detail-btn px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs sm:text-sm font-medium rounded-lg transition" data-detail-id="${key}">
                                 詳細
                             </button>
-                            <button type="button" class="delete-btn px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium rounded-lg transition" data-id="${key}">
+                            <button type="button" class="delete-btn px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-xs sm:text-sm font-medium rounded-lg transition">
                                 刪除
                             </button>
                         </div>
@@ -352,7 +351,7 @@
 
                     formTitle.textContent = "編輯學術會議";
                     submitBtn.textContent = "更新活動";
-                    submitBtn.className = "flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 px-4 rounded-lg transition";
+                    submitBtn.className = "w-full sm:flex-1 bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 px-4 rounded-lg transition text-sm sm:text-base";
                     cancelEditBtn.classList.remove("hidden");
                     
                     window.scrollTo({ top: 0, behavior: 'smooth' });
