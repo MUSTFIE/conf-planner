@@ -123,6 +123,70 @@
         syncStatus.textContent = "已連線同步";
         syncStatus.className = "text-sm text-green-600 font-medium";
 
+        // 計算各會議模組/分組的綜合完成進度
+        function calculateEventProgress(event) {
+            // 相容舊版的單純 tasks 陣列或新版多模組結構
+            if (event.tasks) {
+                const tasks = Object.values(event.tasks);
+                const total = tasks.length;
+                const done = tasks.filter(t => t.completed).length;
+                return total > 0 ? Math.round((done / total) * 100) : 0;
+            }
+
+            // 若有對應的子模組資料 (對應 detail.html 結構)
+            let grandTotal = 0;
+            let grandDone = 0;
+            const subModules = ['speakers', 'accommodation', 'finance', 'transport', 'guests', 'venue', 'catering', 'design', 'pr'];
+            
+            subModules.forEach(modKey => {
+                const mod = event[modKey];
+                if (!mod || !mod.items) return;
+
+                let t = 0;
+                let d = 0;
+
+                if (modKey === 'speakers') {
+                    mod.items.forEach(s => {
+                        const keys = ['invitation', 'photo', 'bio', 'abstract', 'idCard', 'accommodation', 'transport'];
+                        t += keys.length;
+                        keys.forEach(k => { if (s.tasks && s.tasks[k]) d++; });
+                    });
+                } else if (modKey === 'accommodation') {
+                    mod.items.forEach(a => { 
+                        t += 2; 
+                        if (a.booked) d++; 
+                        if (a.confirmed) d++; 
+                    });
+                } else if (modKey === 'finance') {
+                    t = mod.items.length;
+                    d = mod.items.filter(i => i.completed).length;
+                } else if (modKey === 'transport') {
+                    mod.items.forEach(item => {
+                        if (item.legs && item.legs.length > 0) {
+                            t += item.legs.length;
+                            d += item.legs.filter(l => l.confirmed).length;
+                        } else {
+                            t += 1;
+                        }
+                    });
+                } else if (modKey === 'guests') {
+                    mod.items.forEach(g => {
+                        t += 2; 
+                        if (g.invitationChecked) d++;
+                        if (g.confirmedChecked) d++;
+                    });
+                } else {
+                    t = mod.items.length;
+                    d = mod.items.filter(i => i.completed).length;
+                }
+
+                grandTotal += t;
+                grandDone += d;
+            });
+
+            return grandTotal > 0 ? Math.round((grandDone / grandTotal) * 100) : 0;
+        }
+
         // 提交表單（包含新增與更新邏輯）
         form.addEventListener("submit", (e) => {
             e.preventDefault();
@@ -224,10 +288,7 @@
 
             Object.keys(data).forEach((key) => {
                 const event = data[key];
-                const tasks = event.tasks ? Object.values(event.tasks) : [];
-                const totalTasks = tasks.length;
-                const completedTasks = tasks.filter(t => t.completed).length;
-                const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+                const progress = calculateEventProgress(event);
 
                 const name = `"${(event.name || "").replace(/"/g, '""')}"`;
                 const date = `"${(event.date || "").replace(/"/g, '""')}"`;
@@ -274,11 +335,8 @@
             eventKeys.forEach((key) => {
                 const event = data[key];
                 
-                // 修正：確實從資料中計算子任務進度
-                const tasks = event.tasks ? Object.values(event.tasks) : [];
-                const totalTasks = tasks.length;
-                const completedTasks = tasks.filter(t => t.completed).length;
-                const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+                // 動態計算各分組綜合完成進度
+                const progress = calculateEventProgress(event);
 
                 const item = document.createElement("div");
                 item.className = "bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition flex flex-col md:flex-row justify-between items-start md:items-center gap-4";
