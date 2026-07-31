@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>國際學術工程會議籌備管理系統</title>
+    <title>會議籌備管理系統</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -140,9 +140,14 @@
                     <h2 class="text-lg sm:text-xl font-bold text-slate-900">🎙️ 講者管理模組</h2>
                     <p class="text-slate-500 text-xs sm:text-sm mt-1">管理會議 Keynote / Invited Speaker 之物料收件。</p>
                 </div>
-                <div class="flex items-center gap-3 w-full md:w-auto">
+                <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
                     <span id="sp-progress-badge" class="text-xs sm:text-sm font-bold bg-brand-50 text-brand-700 px-4 py-2 rounded-xl border border-brand-100 text-center">完成度: 0%</span>
                     <button onclick="exportCSV('speakers')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition whitespace-nowrap">📥 匯出 CSV</button>
+                    <!-- 新增：匯入 CSV 按鈕 -->
+                    <label class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition cursor-pointer whitespace-nowrap inline-flex items-center gap-1">
+                        📤 匯入 CSV
+                        <input type="file" accept=".csv" class="hidden" onchange="importCSV(event, 'speakers')">
+                    </label>
                     <input type="text" id="speaker-search" oninput="renderSpeakers()" placeholder="🔍 搜尋..." class="w-full md:w-48 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                 </div>
             </div>
@@ -278,7 +283,239 @@
             </div>
         </div>
 
-        <!-- 4. 財務預算模組 -->
+        <!-- 4. 交通安排模組 -->
+        <div id="view-transport" class="tab-view hidden space-y-6">
+            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 class="text-lg sm:text-xl font-bold text-slate-900">🚗 交通安排模組</h2>
+                    <p class="text-slate-500 text-xs sm:text-sm mt-1">統計不同嘉賓的專車調派與詳細行程。</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                    <span id="trans-progress-badge" class="text-xs sm:text-sm font-bold bg-brand-50 text-brand-700 px-4 py-2 rounded-xl border border-brand-100 text-center">總嘉賓數: 0 | 總行程數: 0 | 完成度: 0%</span>
+                    <button onclick="exportCSV('transport')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition whitespace-nowrap">📥 匯出 CSV</button>
+                    <input type="text" id="trans-search" oninput="renderTransport()" placeholder="🔍 搜尋嘉賓..." class="w-full md:w-48 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                </div>
+            </div>
+
+            <!-- 新增/修改嘉賓交通安排表單 -->
+            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
+                <h3 id="trans-form-title" class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-brand-600"></span> 新增嘉賓交通檔案
+                </h3>
+                <form id="form-transport" onsubmit="handleTransportSubmit(event)" class="space-y-4">
+                    <input type="hidden" id="trans-id">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">嘉賓姓名 *</label>
+                            <input type="text" id="trans-guestname" required placeholder="例如：Prof. Alan Turing" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">總體備註</label>
+                            <input type="text" id="trans-remark" placeholder="例如：VIP 專車接送" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        </div>
+                    </div>
+
+                    <!-- 行程段落動態清單 -->
+                    <div class="border-t border-slate-100 pt-4 space-y-3">
+                        <div class="flex justify-between items-center">
+                            <label class="text-xs font-bold text-slate-700 uppercase tracking-wider">行程明細 (可新增多筆：接機、送機、會場接送等)</label>
+                            <button type="button" onclick="addTransportLegRow()" class="bg-brand-50 hover:bg-brand-100 text-brand-600 text-xs font-semibold px-3 py-1.5 rounded-lg transition">+ 增加行程段落</button>
+                        </div>
+                        <div id="transport-legs-container" class="space-y-3">
+                            <!-- 動態插入行程列 -->
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end gap-3 pt-2">
+                        <button type="button" id="trans-cancel-btn" onclick="resetTransportForm()" class="hidden text-sm bg-slate-100 text-slate-700 py-2.5 px-5 rounded-xl">取消</button>
+                        <button type="submit" id="trans-submit-btn" class="text-sm bg-brand-600 text-white font-medium py-2.5 px-6 rounded-xl shadow-sm">儲存交通安排</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 交通安排總覽卡片清單 -->
+            <div id="transport-cards-list" class="space-y-4">
+                <!-- 動態生成各嘉賓的交通明細卡片 -->
+            </div>
+        </div>
+
+        <!-- 5. 場地設備模組 -->
+        <div id="view-venue" class="tab-view hidden space-y-6">
+            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 id="gen-module-title-venue" class="text-lg sm:text-xl font-bold text-slate-900">分組標題</h2>
+                    <p id="gen-module-desc-venue" class="text-slate-500 text-xs sm:text-sm mt-1">分組說明。</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="gen-progress-badge-venue" class="text-xs sm:text-sm font-bold bg-brand-50 text-brand-700 px-4 py-2 rounded-xl border border-brand-100">進度: 0%</span>
+                    <button onclick="exportCSV('venue')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition whitespace-nowrap">📥 匯出 CSV</button>
+                </div>
+            </div>
+
+            <!-- 表單區 -->
+            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80">
+                <form id="form-venue" onsubmit="handleGenericSubmit(event, 'venue')" class="flex flex-col sm:flex-row gap-3">
+                    <input type="hidden" id="venue-item-id">
+                    <input type="text" id="venue-input-name" required placeholder="工作項目內容..." class="flex-1 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    <input type="text" id="venue-input-sub" placeholder="負責人或備註..." class="sm:w-64 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    <div class="flex gap-2">
+                        <button type="submit" id="venue-submit-btn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm px-6 py-3 rounded-xl shadow-sm transition shrink-0 flex-1 sm:flex-none">新增</button>
+                        <button type="button" id="venue-cancel-btn" onclick="resetGenericForm('venue')" class="hidden bg-slate-100 text-slate-700 text-sm px-4 py-3 rounded-xl shrink-0">取消</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 清單數據表格 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                <div class="overflow-x-auto pb-4">
+                    <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-max">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold">
+                                <th class="p-4 w-12 text-center">狀態</th>
+                                <th class="p-4">工作項目內容</th>
+                                <th class="p-4">負責人 / 備註</th>
+                                <th class="p-4 text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-venue-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. 餐飲規劃模組 -->
+        <div id="view-catering" class="tab-view hidden space-y-6">
+            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 id="gen-module-title-catering" class="text-lg sm:text-xl font-bold text-slate-900">分組標題</h2>
+                    <p id="gen-module-desc-catering" class="text-slate-500 text-xs sm:text-sm mt-1">分組說明。</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="gen-progress-badge-catering" class="text-xs sm:text-sm font-bold bg-brand-50 text-brand-700 px-4 py-2 rounded-xl border border-brand-100">進度: 0%</span>
+                    <button onclick="exportCSV('catering')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition whitespace-nowrap">📥 匯出 CSV</button>
+                </div>
+            </div>
+
+            <!-- 表單區 -->
+            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80">
+                <form id="form-catering" onsubmit="handleGenericSubmit(event, 'catering')" class="flex flex-col sm:flex-row gap-3">
+                    <input type="hidden" id="catering-item-id">
+                    <input type="text" id="catering-input-name" required placeholder="工作項目內容..." class="flex-1 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    <input type="text" id="catering-input-sub" placeholder="負責人或備註..." class="sm:w-64 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    <div class="flex gap-2">
+                        <button type="submit" id="catering-submit-btn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm px-6 py-3 rounded-xl shadow-sm transition shrink-0 flex-1 sm:flex-none">新增</button>
+                        <button type="button" id="catering-cancel-btn" onclick="resetGenericForm('catering')" class="hidden bg-slate-100 text-slate-700 text-sm px-4 py-3 rounded-xl shrink-0">取消</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 清單數據表格 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                <div class="overflow-x-auto pb-4">
+                    <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-max">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold">
+                                <th class="p-4 w-12 text-center">狀態</th>
+                                <th class="p-4">工作項目內容</th>
+                                <th class="p-4">負責人 / 備註</th>
+                                <th class="p-4 text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-catering-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 7. 設計物料模組 -->
+        <div id="view-design" class="tab-view hidden space-y-6">
+            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 id="gen-module-title-design" class="text-lg sm:text-xl font-bold text-slate-900">分組標題</h2>
+                    <p id="gen-module-desc-design" class="text-slate-500 text-xs sm:text-sm mt-1">分組說明。</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="gen-progress-badge-design" class="text-xs sm:text-sm font-bold bg-brand-50 text-brand-700 px-4 py-2 rounded-xl border border-brand-100">進度: 0%</span>
+                    <button onclick="exportCSV('design')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition whitespace-nowrap">📥 匯出 CSV</button>
+                </div>
+            </div>
+
+            <!-- 表單區 -->
+            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80">
+                <form id="form-design" onsubmit="handleGenericSubmit(event, 'design')" class="flex flex-col sm:flex-row gap-3">
+                    <input type="hidden" id="design-item-id">
+                    <input type="text" id="design-input-name" required placeholder="工作項目內容..." class="flex-1 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    <input type="text" id="design-input-sub" placeholder="負責人或備註..." class="sm:w-64 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    <div class="flex gap-2">
+                        <button type="submit" id="design-submit-btn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm px-6 py-3 rounded-xl shadow-sm transition shrink-0 flex-1 sm:flex-none">新增</button>
+                        <button type="button" id="design-cancel-btn" onclick="resetGenericForm('design')" class="hidden bg-slate-100 text-slate-700 text-sm px-4 py-3 rounded-xl shrink-0">取消</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 清單數據表格 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                <div class="overflow-x-auto pb-4">
+                    <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-max">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold">
+                                <th class="p-4 w-12 text-center">狀態</th>
+                                <th class="p-4">工作項目內容</th>
+                                <th class="p-4">負責人 / 備註</th>
+                                <th class="p-4 text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-design-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 8. 公關徵稿模組 -->
+        <div id="view-pr" class="tab-view hidden space-y-6">
+            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h2 id="gen-module-title-pr" class="text-lg sm:text-xl font-bold text-slate-900">分組標題</h2>
+                    <p id="gen-module-desc-pr" class="text-slate-500 text-xs sm:text-sm mt-1">分組說明。</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span id="gen-progress-badge-pr" class="text-xs sm:text-sm font-bold bg-brand-50 text-brand-700 px-4 py-2 rounded-xl border border-brand-100">進度: 0%</span>
+                    <button onclick="exportCSV('pr')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition whitespace-nowrap">📥 匯出 CSV</button>
+                </div>
+            </div>
+
+            <!-- 表單區 -->
+            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80">
+                <form id="form-pr" onsubmit="handleGenericSubmit(event, 'pr')" class="flex flex-col sm:flex-row gap-3">
+                    <input type="hidden" id="pr-item-id">
+                    <input type="text" id="pr-input-name" required placeholder="工作項目內容..." class="flex-1 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    <input type="text" id="pr-input-sub" placeholder="負責人或備註..." class="sm:w-64 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    <div class="flex gap-2">
+                        <button type="submit" id="pr-submit-btn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm px-6 py-3 rounded-xl shadow-sm transition shrink-0 flex-1 sm:flex-none">新增</button>
+                        <button type="button" id="pr-cancel-btn" onclick="resetGenericForm('pr')" class="hidden bg-slate-100 text-slate-700 text-sm px-4 py-3 rounded-xl shrink-0">取消</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 清單數據表格 -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                <div class="overflow-x-auto pb-4">
+                    <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-max">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold">
+                                <th class="p-4 w-12 text-center">狀態</th>
+                                <th class="p-4">工作項目內容</th>
+                                <th class="p-4">負責人 / 備註</th>
+                                <th class="p-4 text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-pr-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 9. 財務預算模組 -->
         <div id="view-finance" class="tab-view hidden space-y-6">
             <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
@@ -337,7 +574,7 @@
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">付款方/收款方</label>
-                        <input type="text" id="fin-payer" placeholder="付款或收款單位..." class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        <input type="text" id="fin-payer" placeholder="付款 or 收款單位..." class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                     </div>
                     <div class="sm:col-span-2 lg:col-span-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
                         <label class="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200">
@@ -402,102 +639,98 @@
             </div>
         </div>
 
-        <!-- 5. 交通安排模組 (已調整) -->
-        <div id="view-transport" class="tab-view hidden space-y-6">
+        <!-- 10. 嘉賓管理模組 -->
+        <div id="view-guests" class="tab-view hidden space-y-6">
             <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h2 class="text-lg sm:text-xl font-bold text-slate-900">🚗 交通安排模組</h2>
-                    <p class="text-slate-500 text-xs sm:text-sm mt-1">統計不同嘉賓的專車調派與詳細行程。</p>
+                    <h2 class="text-lg sm:text-xl font-bold text-slate-900">🤝 嘉賓管理模組</h2>
+                    <p class="text-slate-500 text-xs sm:text-sm mt-1">管理主禮嘉賓、校領導、特邀貴賓資料與聯絡窗口。</p>
                 </div>
-                <!-- 調整點 2：上方的總結位置除了顯示總嘉賓數，還要有總行程數及完成度 -->
                 <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                    <span id="trans-progress-badge" class="text-xs sm:text-sm font-bold bg-brand-50 text-brand-700 px-4 py-2 rounded-xl border border-brand-100 text-center">總嘉賓數: 0 | 總行程數: 0 | 完成度: 0%</span>
-                    <button onclick="exportCSV('transport')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition whitespace-nowrap">📥 匯出 CSV</button>
-                    <input type="text" id="trans-search" oninput="renderTransport()" placeholder="🔍 搜尋嘉賓..." class="w-full md:w-48 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    <span id="guest-progress-badge" class="text-xs sm:text-sm font-bold bg-brand-50 text-brand-700 px-4 py-2 rounded-xl border border-brand-100 text-center">總嘉賓: 0</span>
+                    <button onclick="exportCSV('guests')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition whitespace-nowrap">📥 匯出 CSV</button>
+                    <!-- 新增：匯入 CSV 按鈕 -->
+                    <label class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition cursor-pointer whitespace-nowrap inline-flex items-center gap-1">
+                        📤 匯入 CSV
+                        <input type="file" accept=".csv" class="hidden" onchange="importCSV(event, 'guests')">
+                    </label>
+                    <input type="text" id="guest-search" oninput="renderGuests()" placeholder="🔍 搜尋嘉賓..." class="w-full md:w-48 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                 </div>
             </div>
 
-            <!-- 新增/修改嘉賓交通安排表單 -->
-            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
-                <h3 id="trans-form-title" class="text-sm font-bold text-slate-800 flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-brand-600"></span> 新增嘉賓交通檔案
-                </h3>
-                <form id="form-transport" onsubmit="handleTransportSubmit(event)" class="space-y-4">
-                    <input type="hidden" id="trans-id">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">嘉賓姓名 *</label>
-                            <input type="text" id="trans-guestname" required placeholder="例如：Prof. Alan Turing" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-slate-600 mb-1">總體備註</label>
-                            <input type="text" id="trans-remark" placeholder="例如：VIP 專車接送" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                        </div>
-                    </div>
-
-                    <!-- 行程段落動態清單 -->
-                    <div class="border-t border-slate-100 pt-4 space-y-3">
-                        <div class="flex justify-between items-center">
-                            <label class="text-xs font-bold text-slate-700 uppercase tracking-wider">行程明細 (可新增多筆：接機、送機、會場接送等)</label>
-                            <button type="button" onclick="addTransportLegRow()" class="bg-brand-50 hover:bg-brand-100 text-brand-600 text-xs font-semibold px-3 py-1.5 rounded-lg transition">+ 增加行程段落</button>
-                        </div>
-                        <div id="transport-legs-container" class="space-y-3">
-                            <!-- 動態插入行程列 -->
-                        </div>
-                    </div>
-
-                    <div class="flex justify-end gap-3 pt-2">
-                        <button type="button" id="trans-cancel-btn" onclick="resetTransportForm()" class="hidden text-sm bg-slate-100 text-slate-700 py-2.5 px-5 rounded-xl">取消</button>
-                        <button type="submit" id="trans-submit-btn" class="text-sm bg-brand-600 text-white font-medium py-2.5 px-6 rounded-xl shadow-sm">儲存交通安排</button>
-                    </div>
-                </form>
-            </div>
-
-            <!-- 交通安排總覽卡片清單 -->
-            <div id="transport-cards-list" class="space-y-4">
-                <!-- 動態生成各嘉賓的交通明細卡片 -->
-            </div>
-        </div>
-
-        <!-- 6. 通用任務清單模組 -->
-        <div id="view-generic" class="tab-view hidden space-y-6">
-            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h2 id="gen-module-title" class="text-lg sm:text-xl font-bold text-slate-900">分組標題</h2>
-                    <p id="gen-module-desc" class="text-slate-500 text-xs sm:text-sm mt-1">分組說明。</p>
-                </div>
-                <div class="flex items-center gap-3">
-                    <span id="gen-progress-badge" class="text-xs sm:text-sm font-bold bg-brand-50 text-brand-700 px-4 py-2 rounded-xl border border-brand-100">進度: 0%</span>
-                    <button onclick="exportCSV(activeTab)" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition whitespace-nowrap">📥 匯出 CSV</button>
-                </div>
-            </div>
-
-            <!-- 表單區 -->
+            <!-- 新增 / 修改嘉賓表單 -->
             <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80">
-                <form id="form-generic" onsubmit="handleGenericSubmit(event)" class="flex flex-col sm:flex-row gap-3">
-                    <input type="hidden" id="gen-item-id">
-                    <input type="text" id="gen-input-name" required placeholder="工作項目內容..." class="flex-1 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                    <input type="text" id="gen-input-sub" placeholder="負責人或備註..." class="sm:w-64 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                    <div class="flex gap-2">
-                        <button type="submit" id="gen-submit-btn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm px-6 py-3 rounded-xl shadow-sm transition shrink-0 flex-1 sm:flex-none">新增</button>
-                        <button type="button" id="gen-cancel-btn" onclick="resetGenericForm()" class="hidden bg-slate-100 text-slate-700 text-sm px-4 py-3 rounded-xl shrink-0">取消</button>
+                <h3 id="guest-form-title" class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-brand-600"></span> 新增嘉賓資料
+                </h3>
+                <form id="form-guest" onsubmit="handleGuestSubmit(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <input type="hidden" id="guest-id">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">姓名 *</label>
+                        <input type="text" id="guest-name" required placeholder="例如：王大明" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">頭銜 (Title)</label>
+                        <input type="text" id="guest-title" placeholder="例如：Prof. / Dr. / 先生" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">職銜 / 職位 (Position)</label>
+                        <input type="text" id="guest-position" placeholder="例如：董事長 / 院長" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">所屬機構 (Affiliation)</label>
+                        <input type="text" id="guest-org" placeholder="例如：科技大學" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">電郵 (Email)</label>
+                        <input type="email" id="guest-email" placeholder="guest@example.com" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">身份 (Identity)</label>
+                        <input type="text" id="guest-identity" placeholder="例如：主禮嘉賓 / VIP" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">聯絡人姓名</label>
+                        <input type="text" id="guest-contact-name" placeholder="助理或祕書姓名" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <!-- 聯絡人電話 -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">聯絡人電話</label>
+                        <input type="text" id="guest-contact-phone" placeholder="+853 12345678" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <!-- 聯絡人電郵 -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">聯絡人電郵</label>
+                        <input type="email" id="guest-contact-email" placeholder="secretary@example.com" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">車牌號碼</label>
+                        <input type="text" id="guest-plate" placeholder="AB-12-34" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div class="sm:col-span-2 lg:col-span-4 flex justify-end gap-3 mt-2">
+                        <button type="button" id="guest-cancel-btn" onclick="resetGuestForm()" class="hidden text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 px-5 rounded-xl transition w-full sm:w-auto">取消</button>
+                        <button type="submit" id="guest-submit-btn" class="text-sm bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 px-6 rounded-xl shadow-sm transition w-full sm:w-auto">儲存嘉賓資料</button>
                     </div>
                 </form>
             </div>
 
-            <!-- 清單數據表格 -->
+            <!-- 嘉賓數據表格 -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
                 <div class="overflow-x-auto pb-4">
                     <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-max">
                         <thead>
-                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold">
-                                <th class="p-4 w-12 text-center">狀態</th>
-                                <th class="p-4">工作項目內容</th>
-                                <th class="p-4">負責人 / 備註</th>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold">
+                                <th class="p-4">嘉賓名字</th>
+                                <th class="p-4">所屬機構與身分</th>
+                                <th class="p-4">聯絡信箱</th>
+                                <th class="p-4">隨行/對口聯絡人</th>
+                                <th class="p-4">聯絡人電話</th>
+                                <th class="p-4">聯絡人電郵</th>
+                                <th class="p-4">車牌號碼</th>
                                 <th class="p-4 text-right">操作</th>
                             </tr>
                         </thead>
-                        <tbody id="table-generic-body" class="divide-y divide-slate-100"></tbody>
+                        <tbody id="table-guests-body" class="divide-y divide-slate-100"></tbody>
                     </table>
                 </div>
             </div>
@@ -506,7 +739,7 @@
     </main>
 
     <script>
-        // 系統預設資料集
+        // 系統預設資料集 (依指定順序排列)
         const initialSchema = {
             summary: { title: "📊 會議總結" },
             speakers: {
@@ -514,14 +747,14 @@
                 desc: "管理學術研討會 Keynote 及 Invited Speakers 檔案與提交物料。",
                 items: []
             },
+            guests: { 
+                title: "🤝 嘉賓管理", 
+                desc: "邀請主禮嘉賓、校領導與學術界代表。", 
+                items: [] 
+            },
             accommodation: {
                 title: "🏨 住宿安排",
                 desc: "掌握研討會貴賓飯店房間預訂狀態。",
-                items: []
-            },
-            finance: {
-                title: "💰 財務預算",
-                desc: "精準追蹤會議收支、匯率折算與供應商結算狀態。",
                 items: []
             },
             transport: {
@@ -529,11 +762,15 @@
                 desc: "統計不同嘉賓的專車調派與詳細行程。",
                 items: []
             },
-            guests: { title: "🤝 嘉賓管理", desc: "邀請主禮嘉賓、校領導與學術界代表。", items: [] },
             venue: { title: "🏢 場地設備", desc: "會議廳、分會場教室與展覽區之劃分。", items: [] },
             catering: { title: "🍱 餐飲規劃", desc: "茶歇與晚宴準備。", items: [] },
             design: { title: "🎨 設計物料", desc: "主視覺、海報、手冊與名牌。", items: [] },
-            pr: { title: "📢 公關徵稿", desc: "CFP 發布與新聞稿。", items: [] }
+            pr: { title: "📢 公關徵稿", desc: "CFP 發布與新聞稿。", items: [] },
+            finance: {
+                title: "💰 財務預算",
+                desc: "精準追蹤會議收支、匯率折算與供應商結算狀態。",
+                items: []
+            }
         };
 
         let db = {};
@@ -562,6 +799,21 @@
                 try { db = JSON.parse(stored); } catch(e) { db = JSON.parse(JSON.stringify(initialSchema)); }
             } else { db = JSON.parse(JSON.stringify(initialSchema)); }
             
+            // 確保所有模組都存在且順序正確（防止舊 LocalStorage 覆蓋順序）
+            const orderedSchema = JSON.parse(JSON.stringify(initialSchema));
+            Object.keys(orderedSchema).forEach(k => {
+                if (db[k] && db[k].items) {
+                    orderedSchema[k].items = db[k].items;
+                }
+            });
+            // 保留可能存在的自訂欄位
+            Object.keys(db).forEach(k => {
+                if (!orderedSchema[k]) {
+                    orderedSchema[k] = db[k];
+                }
+            });
+            db = orderedSchema;
+
             Object.keys(db).forEach(k => {
                 if (k !== 'summary' && !db[k].items) db[k].items = [];
             });
@@ -679,9 +931,16 @@
                 syncSpeakersToTransport();
                 if (filterQuery !== null) document.getElementById('trans-search').value = filterQuery;
                 renderTransport();
+            } else if (tabKey === 'guests') {
+                document.getElementById('view-guests').classList.remove('hidden');
+                if (filterQuery !== null) document.getElementById('guest-search').value = filterQuery;
+                renderGuests();
             } else {
-                document.getElementById('view-generic').classList.remove('hidden');
-                renderGenericModule(tabKey);
+                const viewEl = document.getElementById(`view-${tabKey}`);
+                if (viewEl) {
+                    viewEl.classList.remove('hidden');
+                    renderGenericModule(tabKey);
+                }
             }
         }
 
@@ -726,6 +985,12 @@
                         } else {
                             t += 1;
                         }
+                    });
+                } else if (key === 'guests') {
+                    mod.items.forEach(g => {
+                        t += 2; 
+                        if (g.invitationChecked) d++;
+                        if (g.confirmedChecked) d++;
                     });
                 } else {
                     t = mod.items.length;
@@ -803,7 +1068,6 @@
                             extraUI = `<br><button onclick="switchTab('accommodation', '${escapeHtml(sp.name)}')" class="mt-1 text-[10px] text-brand-600 bg-brand-100/50 px-1.5 py-0.5 rounded hover:bg-brand-200 transition">🏨 住宿</button>`;
                         }
                     } else if (k === 'transport') {
-                        // 檢查交通安排中該嘉賓的所有行程是否皆已確認
                         const transRecord = db.transport.items.find(t => t.speakerId === sp.id || t.guestName === sp.name);
                         const isTransAllConfirmed = transRecord && transRecord.legs && transRecord.legs.length > 0 && transRecord.legs.every(l => l.confirmed);
                         
@@ -1184,7 +1448,6 @@
             const filter = (document.getElementById('trans-search').value || '').toLowerCase();
             const items = db.transport.items.filter(item => item.guestName.toLowerCase().includes(filter));
 
-            // 計算總嘉賓數、總行程數與完成度
             const totalGuests = db.transport.items.length;
             let totalLegs = 0;
             let completedLegs = 0;
@@ -1254,7 +1517,6 @@
                             </div>
                         </div>
 
-                        <!-- 該嘉賓的交通行程總結表 -->
                         <div class="overflow-x-auto">
                             <table class="w-full text-left border-collapse">
                                 <thead>
@@ -1263,7 +1525,7 @@
                                         <th class="p-3">日期與時間</th>
                                         <th class="p-3">起點與終點</th>
                                         <th class="p-3 text-center">乘車人數</th>
-                                        <th class="p-3">車牌 / 司機 / 電話 (行程總結表輸入)</th>
+                                        <th class="p-3">車牌 / 司機 / 電話</th>
                                         <th class="p-3 text-center">行程確認</th>
                                     </tr>
                                 </thead>
@@ -1277,7 +1539,6 @@
             });
         }
 
-        // 即時更新特定行程段落的車牌/司機/電話欄位
         function updateLegField(itemId, legIndex, field, val) {
             const item = db.transport.items.find(i => i.id === itemId);
             if (item && item.legs && item.legs[legIndex]) {
@@ -1286,16 +1547,13 @@
             }
         }
 
-        // 切換特定嘉賓特定行程段落的確認狀態 (並同步更新講者模組)
         function toggleLegConfirmed(itemId, legIndex) {
             const item = db.transport.items.find(i => i.id === itemId);
             if (item && item.legs && item.legs[legIndex]) {
                 item.legs[legIndex].confirmed = !item.legs[legIndex].confirmed;
                 
-                // 檢查是否該嘉賓的所有行程都已確認
                 const allConfirmed = item.legs.length > 0 && item.legs.every(l => l.confirmed);
                 
-                // 同步更新至對應的講者模組
                 if (item.speakerId) {
                     const sp = db.speakers.items.find(s => s.id === item.speakerId);
                     if (sp) {
@@ -1323,7 +1581,6 @@
             const remark = document.getElementById('trans-remark').value.trim();
 
             const legRows = document.querySelectorAll('.transport-leg-row');
-            
             const existingItem = editId ? db.transport.items.find(i => i.id == editId) : null;
 
             const legs = [];
@@ -1403,24 +1660,162 @@
             }
         }
 
-        window.addEventListener('DOMContentLoaded', () => {
-            initApp();
-            if(document.getElementById('transport-legs-container') && document.getElementById('transport-legs-container').children.length === 0) {
-                addTransportLegRow();
-            }
-        });
+        // --- 10. 嘉賓管理模組 ---
+        function renderGuests() {
+            const tbody = document.getElementById('table-guests-body');
+            tbody.innerHTML = '';
+            const filter = (document.getElementById('guest-search').value || '').toLowerCase();
 
-        // --- 通用任務模組 ---
+            const items = (db.guests.items || []).filter(g => 
+                (g.name && g.name.toLowerCase().includes(filter)) || 
+                (g.org && g.org.toLowerCase().includes(filter)) ||
+                (g.identity && g.identity.toLowerCase().includes(filter))
+            );
+
+            document.getElementById('guest-progress-badge').innerText = `總嘉賓: ${db.guests.items.length}`;
+
+            if (items.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400">目前尚無嘉賓資料。</td></tr>`;
+                return;
+            }
+
+            items.forEach(g => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="p-4">
+                            <div class="flex items-center gap-2 mb-1">
+                                <label class="flex items-center gap-1 text-[11px] bg-slate-100 px-2 py-0.5 rounded cursor-pointer border border-slate-200" title="可勾選邀請函">
+                                    <input type="checkbox" ${g.invitationChecked ? 'checked' : ''} onchange="toggleGuestCheck(${g.id}, 'invitationChecked')" class="w-3.5 h-3.5 text-brand-600 rounded">
+                                    <span>邀請函</span>
+                                </label>
+                                <label class="flex items-center gap-1 text-[11px] bg-emerald-50 px-2 py-0.5 rounded cursor-pointer border border-emerald-200 text-emerald-800" title="可勾選已確認">
+                                    <input type="checkbox" ${g.confirmedChecked ? 'checked' : ''} onchange="toggleGuestCheck(${g.id}, 'confirmedChecked')" class="w-3.5 h-3.5 text-emerald-600 rounded">
+                                    <span>已確認</span>
+                                </label>
+                            </div>
+                            <div class="font-bold text-slate-900 flex items-center gap-2 mt-1">
+                                <span class="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded">${escapeHtml(g.title || '-')}</span>
+                                ${escapeHtml(g.name)}
+                            </div>
+                            <div class="text-xs text-slate-500 mt-1">${escapeHtml(g.position || '-')}</div>
+                        </td>
+                        <td class="p-4">
+                            <div class="text-xs font-semibold text-slate-800">${escapeHtml(g.org || '-')}</div>
+                            <div class="text-[11px] text-brand-600 font-medium mt-0.5">${escapeHtml(g.identity || '-')}</div>
+                        </td>
+                        <td class="p-4 text-xs text-slate-600">${escapeHtml(g.email || '-')}</td>
+                        <td class="p-4">
+                            <div class="text-xs font-medium text-slate-800">${escapeHtml(g.contactName || '-')}</div>
+                        </td>
+                        <td class="p-4 text-xs text-slate-600">${escapeHtml(g.contactPhone || '-')}</td>
+                        <td class="p-4 text-xs text-slate-600">${escapeHtml(g.contactEmail || '-')}</td>
+                        <td class="p-4">
+                            <span class="text-xs font-mono font-bold bg-slate-100 text-slate-700 px-2 py-1 rounded">${escapeHtml(g.plate || '-')}</span>
+                        </td>
+                        <td class="p-4 text-right whitespace-nowrap">
+                            <button onclick="editGuest(${g.id})" class="text-brand-600 hover:text-brand-800 font-medium px-2.5 py-1.5 bg-brand-50 rounded-lg mr-1 text-xs">修改</button>
+                            <button onclick="deleteGuest(${g.id})" class="text-rose-600 hover:text-rose-800 font-medium px-2.5 py-1.5 bg-rose-50 rounded-lg text-xs">刪除</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function toggleGuestCheck(id, field) {
+            const g = db.guests.items.find(item => item.id === id);
+            if (g) {
+                g[field] = !g[field];
+                saveDB();
+                renderGuests();
+            }
+        }
+
+        function handleGuestSubmit(e) {
+            e.preventDefault();
+            const editId = document.getElementById('guest-id').value;
+            const payload = {
+                name: document.getElementById('guest-name').value.trim(),
+                title: document.getElementById('guest-title').value.trim(),
+                position: document.getElementById('guest-position').value.trim(),
+                org: document.getElementById('guest-org').value.trim(),
+                email: document.getElementById('guest-email').value.trim(),
+                identity: document.getElementById('guest-identity').value.trim(),
+                contactName: document.getElementById('guest-contact-name').value.trim(),
+                contactPhone: document.getElementById('guest-contact-phone').value.trim(),
+                contactEmail: document.getElementById('guest-contact-email').value.trim(),
+                plate: document.getElementById('guest-plate').value.trim()
+            };
+
+            if (editId) {
+                const g = db.guests.items.find(item => item.id == editId);
+                if (g) {
+                    payload.invitationChecked = g.invitationChecked || false;
+                    payload.confirmedChecked = g.confirmedChecked || false;
+                    Object.assign(g, payload);
+                }
+            } else {
+                if(!db.guests.items) db.guests.items = [];
+                db.guests.items.push({ id: Date.now(), ...payload, invitationChecked: false, confirmedChecked: false });
+            }
+            saveDB();
+            renderGuests();
+            resetGuestForm();
+        }
+
+        function editGuest(id) {
+            const g = db.guests.items.find(item => item.id === id);
+            if (!g) return;
+            document.getElementById('guest-id').value = g.id;
+            document.getElementById('guest-name').value = g.name || '';
+            document.getElementById('guest-title').value = g.title || '';
+            document.getElementById('guest-position').value = g.position || '';
+            document.getElementById('guest-org').value = g.org || '';
+            document.getElementById('guest-email').value = g.email || '';
+            document.getElementById('guest-identity').value = g.identity || '';
+            document.getElementById('guest-contact-name').value = g.contactName || '';
+            document.getElementById('guest-contact-phone').value = g.contactPhone || '';
+            document.getElementById('guest-contact-email').value = g.contactEmail || '';
+            document.getElementById('guest-plate').value = g.plate || '';
+
+            document.getElementById('guest-form-title').innerText = "修改嘉賓資料";
+            document.getElementById('guest-submit-btn').innerText = "儲存修改";
+            document.getElementById('guest-cancel-btn').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function resetGuestForm() {
+            document.getElementById('form-guest').reset();
+            document.getElementById('guest-id').value = '';
+            document.getElementById('guest-form-title').innerText = "新增嘉賓資料";
+            document.getElementById('guest-submit-btn').innerText = "儲存嘉賓資料";
+            document.getElementById('guest-cancel-btn').classList.add('hidden');
+        }
+
+        function deleteGuest(id) {
+            if (confirm("確定刪除此筆嘉賓資料嗎？")) {
+                db.guests.items = db.guests.items.filter(item => item.id !== id);
+                saveDB();
+                renderGuests();
+            }
+        }
+
+        // --- 通用任務模組 (場地設備、餐飲規劃、設計物料、公關徵稿) ---
         function renderGenericModule(modKey) {
             const mod = db[modKey];
-            document.getElementById('gen-module-title').innerText = mod.title;
-            document.getElementById('gen-module-desc').innerText = mod.desc;
-            const tbody = document.getElementById('table-generic-body');
+            const titleEl = document.getElementById(`gen-module-title-${modKey}`);
+            const descEl = document.getElementById(`gen-module-desc-${modKey}`);
+            const badgeEl = document.getElementById(`gen-progress-badge-${modKey}`);
+            
+            if (titleEl) titleEl.innerText = mod.title;
+            if (descEl) descEl.innerText = mod.desc;
+
+            const tbody = document.getElementById(`table-${modKey}-body`);
+            if (!tbody) return;
             tbody.innerHTML = '';
             const items = mod.items || [];
             const dCount = items.filter(i => i.completed).length;
             const rate = items.length > 0 ? Math.round((dCount / items.length) * 100) : 0;
-            document.getElementById('gen-progress-badge').innerText = `完成度: ${rate}% (${dCount}/${items.length})`;
+            if (badgeEl) badgeEl.innerText = `完成度: ${rate}% (${dCount}/${items.length})`;
 
             if (items.length === 0) { tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-400">尚無工作項目內容。</td></tr>`; return; }
 
@@ -1444,34 +1839,34 @@
             if (item) { item.completed = !item.completed; saveDB(); renderGenericModule(modKey); }
         }
 
-        function handleGenericSubmit(e) {
+        function handleGenericSubmit(e, modKey) {
             e.preventDefault();
-            const editId = document.getElementById('gen-item-id').value;
-            const name = document.getElementById('gen-input-name').value.trim();
-            const sub = document.getElementById('gen-input-sub').value.trim();
+            const editId = document.getElementById(`${modKey}-item-id`).value;
+            const name = document.getElementById(`${modKey}-input-name`).value.trim();
+            const sub = document.getElementById(`${modKey}-input-sub`).value.trim();
             if (!name) return;
             if (editId) {
-                const item = db[activeTab].items.find(i => i.id == editId);
+                const item = db[modKey].items.find(i => i.id == editId);
                 if (item) { item.name = name; item.sub = sub; }
-            } else { db[activeTab].items.push({ id: Date.now(), name, sub, completed: false }); }
-            saveDB(); renderGenericModule(activeTab); resetGenericForm();
+            } else { db[modKey].items.push({ id: Date.now(), name, sub, completed: false }); }
+            saveDB(); renderGenericModule(modKey); resetGenericForm(modKey);
         }
 
         function editGenericItem(modKey, id) {
             const item = db[modKey].items.find(i => i.id === id);
             if (!item) return;
-            document.getElementById('gen-item-id').value = item.id;
-            document.getElementById('gen-input-name').value = item.name;
-            document.getElementById('gen-input-sub').value = item.sub || '';
-            document.getElementById('gen-submit-btn').innerText = "儲存";
-            document.getElementById('gen-cancel-btn').classList.remove('hidden');
+            document.getElementById(`${modKey}-item-id`).value = item.id;
+            document.getElementById(`${modKey}-input-name`).value = item.name;
+            document.getElementById(`${modKey}-input-sub`).value = item.sub || '';
+            document.getElementById(`${modKey}-submit-btn`).innerText = "儲存";
+            document.getElementById(`${modKey}-cancel-btn`).classList.remove('hidden');
         }
 
-        function resetGenericForm() {
-            document.getElementById('form-generic').reset();
-            document.getElementById('gen-item-id').value = '';
-            document.getElementById('gen-submit-btn').innerText = "新增";
-            document.getElementById('gen-cancel-btn').classList.add('hidden');
+        function resetGenericForm(modKey) {
+            document.getElementById(`form-${modKey}`).reset();
+            document.getElementById(`${modKey}-item-id`).value = '';
+            document.getElementById(`${modKey}-submit-btn`).innerText = "新增";
+            document.getElementById(`${modKey}-cancel-btn`).classList.add('hidden');
         }
 
         function deleteGenericItem(modKey, id) {
@@ -1521,6 +1916,11 @@
                         rows.push([item.guestName, item.remark || '', '無行程', '', '', '', '', '', '', '', '', '']);
                     }
                 });
+            } else if (modKey === 'guests') {
+                rows.push(["姓名", "頭銜", "職位", "機構", "電郵", "身份", "邀請函勾選", "已確認勾選", "聯絡人姓名", "聯絡人電話", "聯絡人電郵", "車牌號碼"]);
+                mod.items.forEach(g => {
+                    rows.push([g.name, g.title, g.position, g.org, g.email, g.identity, g.invitationChecked ? '是' : '否', g.confirmedChecked ? '是' : '否', g.contactName, g.contactPhone, g.contactEmail, g.plate]);
+                });
             } else {
                 rows.push(["工作項目內容", "負責人/備註", "狀態"]);
                 mod.items.forEach(i => {
@@ -1541,6 +1941,117 @@
             document.body.appendChild(anchor);
             anchor.click();
             anchor.remove();
+        }
+
+        // --- 匯入 CSV 共通解析邏輯 ---
+        function parseCSV(text) {
+            let lines = text.split(/\r\n|\n/);
+            let result = [];
+            for (let i = 0; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                let row = [];
+                let inQuotes = false;
+                let currentVal = '';
+                for (let j = 0; j < lines[i].length; j++) {
+                    let char = lines[i][j];
+                    if (char === '"') {
+                        if (inQuotes && lines[i][j + 1] === '"') {
+                            currentVal += '"';
+                            j++;
+                        } else {
+                            inQuotes = !inQuotes;
+                        }
+                    } else if (char === ',' && !inQuotes) {
+                        row.push(currentVal);
+                        currentVal = '';
+                    } else {
+                        currentVal += char;
+                    }
+                }
+                row.push(currentVal);
+                result.push(row);
+            }
+            return result;
+        }
+
+        function importCSV(e, modKey) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const text = evt.target.result;
+                    const rows = parseCSV(text);
+                    if (rows.length < 2) {
+                        alert("⚠️ CSV 檔案格式錯誤或無內容。");
+                        return;
+                    }
+                    
+                    let importedCount = 0;
+                    if (modKey === 'speakers') {
+                        for (let i = 1; i < rows.length; i++) {
+                            const cols = rows[i];
+                            if (cols.length >= 1 && cols[0].trim()) {
+                                db.speakers.items.push({
+                                    id: Date.now() + Math.floor(Math.random() * 10000),
+                                    name: cols[0] || '',
+                                    title: cols[1] || 'Prof.',
+                                    position: cols[2] || '',
+                                    org: cols[3] || '',
+                                    email: cols[4] || '',
+                                    identity: cols[5] || '',
+                                    tasks: {
+                                        invitation: cols[6] === 'V',
+                                        photo: cols[7] === 'V',
+                                        bio: cols[8] === 'V',
+                                        abstract: cols[9] === 'V',
+                                        idCard: cols[10] === 'V',
+                                        accommodation: cols[11] === 'V',
+                                        transport: cols[12] === 'V'
+                                    },
+                                    remark: cols[13] || ''
+                                });
+                                importedCount++;
+                            }
+                        }
+                        saveDB();
+                        syncSpeakersToAccommodation();
+                        syncSpeakersToTransport();
+                        renderSpeakers();
+                    } else if (modKey === 'guests') {
+                        for (let i = 1; i < rows.length; i++) {
+                            const cols = rows[i];
+                            if (cols.length >= 1 && cols[0].trim()) {
+                                if(!db.guests.items) db.guests.items = [];
+                                db.guests.items.push({
+                                    id: Date.now() + Math.floor(Math.random() * 10000),
+                                    name: cols[0] || '',
+                                    title: cols[1] || '',
+                                    position: cols[2] || '',
+                                    org: cols[3] || '',
+                                    email: cols[4] || '',
+                                    identity: cols[5] || '',
+                                    invitationChecked: cols[6] === '是',
+                                    confirmedChecked: cols[7] === '是',
+                                    contactName: cols[8] || '',
+                                    contactPhone: cols[9] || '',
+                                    contactEmail: cols[10] || '',
+                                    plate: cols[11] || ''
+                                });
+                                importedCount++;
+                            }
+                        }
+                        saveDB();
+                        renderGuests();
+                    }
+                    alert(`🎉 成功匯入 ${importedCount} 筆資料！`);
+                    e.target.value = '';
+                } catch(err) {
+                    alert("⚠️ 匯入失敗，請確認檔案格式是否正確。");
+                    console.error(err);
+                }
+            };
+            reader.readAsText(file, 'UTF-8');
         }
 
         function exportData() {
@@ -1573,6 +2084,13 @@
         }
 
         function escapeHtml(str) { return String(str||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initApp();
+            if(document.getElementById('transport-legs-container') && document.getElementById('transport-legs-container').children.length === 0) {
+                addTransportLegRow();
+            }
+        });
     </script>
 </body>
 </html>
