@@ -6,6 +6,8 @@
     <title>會議籌備管理系統</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS for Excel (.xlsx) import support -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -22,7 +24,9 @@
     <style>
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        td, th { white-space: nowrap; }
+        th { white-space: nowrap; }
+        td { white-space: normal; word-break: break-word; }
+        td.nowrap-cell { white-space: nowrap; }
         /* 確保導航欄在各裝置下自動適配與靈活換行/滾動 */
         #nav-tabs {
             display: flex;
@@ -31,13 +35,61 @@
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
         }
+        /* 凍結欄位右側陰影效果 */
+        .sticky-col-shadow {
+            box-shadow: 4px 0 8px -4px rgba(15, 23, 42, 0.08);
+        }
+        /* Toast 通知 */
+        #toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            pointer-events: none;
+        }
+        .toast {
+            pointer-events: auto;
+            min-width: 220px;
+            max-width: 360px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.15);
+            animation: toastIn 0.25s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .toast-success { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+        .toast-error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+        .toast-info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+        .toast-warn { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .form-section-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #e2e8f0;
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans antialiased">
+    <div id="toast-container"></div>
 
     <!-- 頂部導航欄 -->
     <header class="bg-slate-900 text-white sticky top-0 z-50 shadow-md backdrop-blur-md bg-opacity-95 border-b border-slate-800">
-        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-col gap-3">
+        <div class="w-full mx-auto px-3 sm:px-4 py-3 flex flex-col gap-3">
             <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                 <div class="flex items-center gap-3">
                     <a href="index.html" class="bg-slate-800 hover:bg-slate-700 px-3 py-2 text-white rounded-lg transition text-xs sm:text-sm font-medium border border-slate-700" title="返回會議列表">
@@ -69,7 +121,7 @@
                 </div>
             </div>
 
-            <!-- 動態模組分頁頁籤 (自動適配各裝置闊度) -->
+            <!-- 動態模組分頁頁籤 -->
             <nav id="nav-tabs" class="pt-2 pb-1 border-t border-slate-800/80">
                 <!-- 由 JS 動態生成按鈕 -->
             </nav>
@@ -77,7 +129,7 @@
     </header>
 
     <!-- 主內容容器 -->
-    <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-4 md:p-6 space-y-6">
+    <main class="flex-1 w-full mx-auto p-3 sm:p-4 md:p-5 space-y-5">
 
         <!-- 1. 會議總結 -->
         <div id="view-summary" class="tab-view space-y-6">
@@ -133,88 +185,170 @@
             </div>
         </div>
 
-        <!-- 2. 講者管理模組 -->
-        <div id="view-speakers" class="tab-view hidden space-y-6">
-            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <!-- 2. 講者管理模組 (優化後的表格互動介面) -->
+        <div id="view-speakers" class="tab-view hidden space-y-5">
+            <!-- 頂部控制列 -->
+            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                 <div>
-                    <h2 class="text-lg sm:text-xl font-bold text-slate-900">🎙️ 講者管理模組</h2>
-                    <p class="text-slate-500 text-xs sm:text-sm mt-1">管理會議 Keynote / Invited Speaker 之物料收件。</p>
+                    <div class="flex items-center gap-3">
+                        <h2 class="text-lg sm:text-xl font-bold text-slate-900">🎙️ 講者管理模組</h2>
+                        <span id="sp-progress-badge" class="text-xs font-bold bg-brand-50 text-brand-700 px-3 py-1 rounded-full border border-brand-100">完成度: 0%</span>
+                    </div>
+                    <p class="text-slate-500 text-xs sm:text-sm mt-1">點擊「物料膠囊」可直接切換繳交狀態，向左滑動表格檢視更多欄位。</p>
                 </div>
-                <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                    <span id="sp-progress-badge" class="text-xs sm:text-sm font-bold bg-brand-50 text-brand-700 px-4 py-2 rounded-xl border border-brand-100 text-center">完成度: 0%</span>
-                    <button onclick="exportCSV('speakers')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition whitespace-nowrap">📥 匯出 CSV</button>
-                    <!-- 新增：匯入 CSV 按鈕 -->
-                    <label class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition cursor-pointer whitespace-nowrap inline-flex items-center gap-1">
-                        📤 匯入 CSV
-                        <input type="file" accept=".csv" class="hidden" onchange="importCSV(event, 'speakers')">
+                <div class="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+                    <button type="button" onclick="toggleSpeakerForm()" id="sp-toggle-form-btn" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition flex items-center gap-1.5 whitespace-nowrap">
+                        <span>➕ 新增講者</span>
+                    </button>
+                    <button onclick="exportCSV('speakers')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl transition whitespace-nowrap">📥 匯出 CSV</button>
+                    <label class="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 text-xs font-medium px-3.5 py-2.5 rounded-xl transition cursor-pointer whitespace-nowrap inline-flex items-center gap-1">
+                        📤 匯入
+                        <input type="file" accept=".csv,.xlsx,.xls" class="hidden" onchange="importCSV(event, 'speakers')">
                     </label>
-                    <input type="text" id="speaker-search" oninput="renderSpeakers()" placeholder="🔍 搜尋..." class="w-full md:w-48 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                 </div>
             </div>
 
-            <!-- 新增 / 修改講者表單 -->
-            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80">
-                <h3 id="sp-form-title" class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-brand-600"></span> 新增講者資料
-                </h3>
-                <form id="form-speaker" onsubmit="handleSpeakerSubmit(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- 摺疊式 新增 / 修改講者表單 -->
+            <div id="sp-form-wrapper" class="hidden bg-white p-5 sm:p-6 rounded-2xl shadow-md border-2 border-brand-200/80 transition-all">
+                <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                    <h3 id="sp-form-title" class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-brand-600"></span> 新增講者資料
+                    </h3>
+                    <button type="button" onclick="toggleSpeakerForm(false)" class="text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-100">✕ 收合表單</button>
+                </div>
+                <form id="form-speaker" onsubmit="handleSpeakerSubmit(event)" oninput="markFormDirty()" class="space-y-5">
                     <input type="hidden" id="sp-id">
+                    <!-- 基本資料 -->
                     <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">姓名 *</label>
-                        <input type="text" id="sp-name" required placeholder="例如：Prof. John Doe" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        <div class="form-section-title">基本資料</div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">姓名 <span class="text-rose-500">*</span></label>
+                                <input type="text" id="sp-name" required placeholder="例如：John Doe" class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">頭銜 (Title)</label>
+                                <select id="sp-title" onchange="handleTitleChange()" class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                                    <option value="Chair Prof.">Chair Prof.</option>
+                                    <option value="Prof.">Prof.</option>
+                                    <option value="Dr.">Dr.</option>
+                                    <option value="Mr.">Mr.</option>
+                                    <option value="Ms.">Ms.</option>
+                                    <option value="other">其他 (自訂...)</option>
+                                </select>
+                                <input type="text" id="sp-title-custom" placeholder="請輸入自訂頭銜" class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none mt-2 hidden">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">職銜 / 職位 (Position)</label>
+                                <input type="text" id="sp-position" placeholder="例如：院長 / 講座教授" class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">所屬機構 (Affiliation)</label>
+                                <input type="text" id="sp-org" placeholder="例如：麻省理工學院" class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">電郵 (Email)</label>
+                                <input type="email" id="sp-email" placeholder="speaker@university.edu" class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">身份標籤 (Identity) <span class="text-slate-400 font-normal">建議填寫</span></label>
+                                <input type="text" id="sp-identity" placeholder="例如：Keynote Speaker" class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">參與方式 (Mode) <span class="text-rose-500">*</span></label>
+                                <select id="sp-mode" class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                                    <option value="in-person">現場 (In-person)</option>
+                                    <option value="online">線上 (Online)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-slate-600 mb-1">演講主題 (Topic)</label>
+                                <input type="text" id="sp-topic" placeholder="例如：AI in Education" class="w-full border border-slate-200 rounded-xl p-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                            </div>
+                        </div>
                     </div>
+                    <!-- 行程資訊 -->
                     <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">頭銜 (Title)</label>
-                        <select id="sp-title" onchange="handleTitleChange()" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white mb-2">
-                            <option value="Chair Prof.">Chair Prof.</option>
-                            <option value="Prof.">Prof.</option>
-                            <option value="Dr.">Dr.</option>
-                            <option value="Mr.">Mr.</option>
-                            <option value="Ms.">Ms.</option>
-                            <option value="other">其他 (自訂...)</option>
-                        </select>
-                        <input type="text" id="sp-title-custom" placeholder="請輸入自訂頭銜" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none hidden">
+                        <div class="form-section-title">行程資訊</div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/70 space-y-2.5">
+                                <p class="text-xs font-bold text-emerald-700">✈️ 到達澳門資訊</p>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                    <div>
+                                        <label class="block text-[11px] text-slate-500 mb-0.5">到達時間</label>
+                                        <input type="datetime-local" id="sp-arrival-time" class="w-full border border-slate-200 rounded-lg p-2 text-xs bg-white outline-none focus:border-brand-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] text-slate-500 mb-0.5">航班編號</label>
+                                        <input type="text" id="sp-arrival-flight" placeholder="CX888" class="w-full border border-slate-200 rounded-lg p-2 text-xs bg-white outline-none focus:border-brand-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] text-slate-500 mb-0.5">到達地點</label>
+                                        <input type="text" id="sp-arrival-location" placeholder="澳門機場" class="w-full border border-slate-200 rounded-lg p-2 text-xs bg-white outline-none focus:border-brand-500">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/70 space-y-2.5">
+                                <p class="text-xs font-bold text-rose-700">🛫 離開澳門資訊</p>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                    <div>
+                                        <label class="block text-[11px] text-slate-500 mb-0.5">離開時間</label>
+                                        <input type="datetime-local" id="sp-departure-time" class="w-full border border-slate-200 rounded-lg p-2 text-xs bg-white outline-none focus:border-brand-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] text-slate-500 mb-0.5">航班編號</label>
+                                        <input type="text" id="sp-departure-flight" placeholder="CX889" class="w-full border border-slate-200 rounded-lg p-2 text-xs bg-white outline-none focus:border-brand-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] text-slate-500 mb-0.5">離開地點</label>
+                                        <input type="text" id="sp-departure-location" placeholder="澳門機場" class="w-full border border-slate-200 rounded-lg p-2 text-xs bg-white outline-none focus:border-brand-500">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">職銜 / 職位 (Position)</label>
-                        <input type="text" id="sp-position" placeholder="例如：院長 / 講座教授" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">所屬機構 (Affiliation)</label>
-                        <input type="text" id="sp-org" placeholder="例如：麻省理工學院" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">電郵 (Email)</label>
-                        <input type="email" id="sp-email" placeholder="speaker@university.edu" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">身份標籤 (Identity)</label>
-                        <input type="text" id="sp-identity" placeholder="例如：Keynote Speaker" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                    </div>
-                    <div class="sm:col-span-2 lg:col-span-3 flex justify-end gap-3 mt-2">
-                        <button type="button" id="sp-cancel-btn" onclick="resetSpeakerForm()" class="hidden text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 px-5 rounded-xl transition w-full sm:w-auto">取消</button>
-                        <button type="submit" id="sp-submit-btn" class="text-sm bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 px-5 rounded-xl shadow-sm transition w-full sm:w-auto">儲存講者</button>
+                    <div class="flex justify-end gap-2.5 pt-1">
+                        <button type="button" id="sp-cancel-btn" onclick="resetSpeakerForm(true)" class="text-xs sm:text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2 px-5 rounded-xl transition">取消</button>
+                        <button type="submit" id="sp-submit-btn" class="text-xs sm:text-sm bg-brand-600 hover:bg-brand-700 text-white font-medium py-2 px-6 rounded-xl shadow-sm transition">儲存講者</button>
                     </div>
                 </form>
             </div>
 
-            <!-- 講者數據表格 -->
+            <!-- 篩選與搜尋工具列 -->
+            <div class="bg-white p-3.5 sm:px-5 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
+                        <button type="button" onclick="setSpeakerModeFilter('all')" id="sp-filter-all" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-800 shadow-sm transition">全部</button>
+                        <button type="button" onclick="setSpeakerModeFilter('in-person')" id="sp-filter-in-person" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 transition">現場</button>
+                        <button type="button" onclick="setSpeakerModeFilter('online')" id="sp-filter-online" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 transition">線上</button>
+                    </div>
+                    <select id="speaker-sort" onchange="speakerSort=this.value;renderSpeakers()" class="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:ring-2 focus:ring-brand-500 outline-none">
+                        <option value="name-asc">姓名 A→Z</option>
+                        <option value="name-desc">姓名 Z→A</option>
+                        <option value="progress-desc">完成度高→低</option>
+                        <option value="progress-asc">完成度低→高</option>
+                    </select>
+                </div>
+                <div class="relative w-full sm:w-64">
+                    <input type="text" id="speaker-search" oninput="renderSpeakers()" placeholder="🔍 搜尋姓名、機構、主題..." class="w-full border border-slate-200 rounded-xl pl-3.5 pr-8 py-2 text-xs sm:text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-slate-50/50 focus:bg-white transition">
+                </div>
+            </div>
+
+            <!-- 優化後的講者數據表格 (凍結首欄 + 狀態膠囊互動) -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden relative">
-                <div class="overflow-x-auto pb-4">
-                    <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-max">
-                        <thead>
-                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold">
-                                <th class="p-4">講者基本資料</th>
-                                <th class="p-4">聯絡與身分</th>
-                                <th class="p-3 text-center">邀請函</th>
-                                <th class="p-3 text-center">照片</th>
-                                <th class="p-3 text-center">Bio</th>
-                                <th class="p-3 text-center">摘要</th>
-                                <th class="p-3 text-center">證件</th>
-                                <th class="p-3 text-center bg-brand-50/50">住宿</th>
-                                <th class="p-3 text-center">交通</th>
-                                <th class="p-4">備註說明</th>
-                                <th class="p-4 text-right">操作</th>
+                <div class="overflow-x-auto max-h-[65vh] overflow-y-auto">
+                    <table class="w-full text-left border-collapse text-sm min-w-max">
+                        <thead class="sticky top-0 z-30">
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider font-bold">
+                                <th class="p-3 sticky left-0 z-40 bg-slate-50 sticky-col-shadow min-w-[70px] text-center">操作</th>
+                                <th class="p-3 min-w-[90px] text-center">方式 / 身份</th>
+                                <th class="p-4 min-w-[140px]">姓名</th>
+                                <th class="p-4 min-w-[160px]">機構</th>
+                                <th class="p-4 min-w-[160px]">電郵</th>
+                                <th class="p-4 min-w-[220px]">物料繳交狀態 <span class="font-normal text-slate-400 normal-case">(點擊切換)</span></th>
+                                <th class="p-4 text-center bg-brand-50/40 min-w-[120px]">後勤支援</th>
+                                <th class="p-4 min-w-[180px]">行程摘要</th>
+                                <th class="p-4 min-w-[140px]">備註</th>
                             </tr>
                         </thead>
                         <tbody id="table-speakers-body" class="divide-y divide-slate-100"></tbody>
@@ -237,44 +371,83 @@
                 </div>
             </div>
 
-            <!-- 手動新增住宿者 -->
-            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80">
-                <h3 id="acc-form-title" class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-brand-600"></span> 手動新增 / 修改住宿人員
-                </h3>
-                <form id="form-accommodation" onsubmit="handleAccommodationSubmit(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- 1. 手動新增 / 修改住宿人員（摺疊） -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                <div class="flex justify-between items-center p-4 sm:p-5 cursor-pointer select-none" onclick="toggleAccForm()">
+                    <h3 id="acc-form-title" class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-brand-600"></span> 手動新增 / 修改住宿人員
+                    </h3>
+                    <button type="button" id="acc-toggle-form-btn" class="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded-lg hover:bg-slate-100">▼ 展開</button>
+                </div>
+                <div id="acc-form-wrapper" class="hidden px-4 sm:px-5 pb-5 border-t border-slate-100">
+                    <form id="form-accommodation" onsubmit="handleAccommodationSubmit(event)" oninput="markFormDirty()" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-4">
                     <input type="hidden" id="acc-id">
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">姓名 *</label>
                         <input type="text" id="acc-name" required placeholder="例如：張三" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">護照/英文名</label>
-                        <input type="text" id="acc-engname" placeholder="Zhang San" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Surname (姓)</label>
+                        <input type="text" id="acc-surname" placeholder="Zhang" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Given and Middle Name (名)</label>
+                        <input type="text" id="acc-givenname" placeholder="San" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">飯店預約號</label>
                         <input type="text" id="acc-confno" placeholder="BK-100293" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">入住日期 (Check-in)</label>
+                        <input type="date" id="acc-checkin" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">退房日期 (Check-out)</label>
+                        <input type="date" id="acc-checkout" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div class="sm:col-span-2 lg:col-span-3">
+                        <label class="block text-xs font-medium text-slate-600 mb-1">備註</label>
+                        <input type="text" id="acc-remark" placeholder="例如：需無煙房 / 晚到請保留" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                     </div>
                     <div class="sm:col-span-2 lg:col-span-3 flex justify-end gap-3">
                         <button type="button" id="acc-cancel-btn" onclick="resetAccForm()" class="hidden text-sm bg-slate-100 text-slate-700 py-2.5 px-5 rounded-xl w-full sm:w-auto">取消</button>
                         <button type="submit" id="acc-submit-btn" class="text-sm bg-brand-600 text-white font-medium py-2.5 px-5 rounded-xl shadow-sm w-full sm:w-auto">新增住宿</button>
                     </div>
                 </form>
+                </div>
+            </div>
+
+            <!-- 住宿狀態篩選 + 排序 -->
+            <div class="bg-white p-3.5 sm:px-5 rounded-2xl shadow-sm border border-slate-200/80 flex flex-wrap items-center gap-2">
+                <span class="text-xs font-semibold text-slate-500 mr-1">狀態：</span>
+                <button type="button" onclick="setAccStatusFilter('all')" id="acc-filter-all" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-800 shadow-sm border border-slate-200 transition">全部</button>
+                <button type="button" onclick="setAccStatusFilter('pending')" id="acc-filter-pending" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 border border-transparent transition">未完成</button>
+                <button type="button" onclick="setAccStatusFilter('booked')" id="acc-filter-booked" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 border border-transparent transition">已預訂</button>
+                <button type="button" onclick="setAccStatusFilter('confirmed')" id="acc-filter-confirmed" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 border border-transparent transition">已確認</button>
+                <select id="acc-sort" onchange="accSort=this.value;renderAccommodation()" class="ml-2 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:ring-2 focus:ring-brand-500 outline-none">
+                    <option value="name-asc">姓名 A→Z</option>
+                    <option value="name-desc">姓名 Z→A</option>
+                    <option value="checkin-asc">入住日 早→晚</option>
+                    <option value="checkin-desc">入住日 晚→早</option>
+                </select>
             </div>
 
             <!-- 住宿表格 -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
-                <div class="overflow-x-auto pb-4">
-                    <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-max">
-                        <thead>
-                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold">
-                                <th class="p-4">住房人員 / 來源</th>
-                                <th class="p-4">護照 / 英文姓名</th>
+                <div class="overflow-x-auto max-h-[65vh] overflow-y-auto pb-4">
+                    <table class="w-full text-left border-collapse text-sm min-w-max">
+                        <thead class="sticky top-0 z-20">
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase font-semibold">
+                                <th class="p-3 text-center min-w-[70px]">操作</th>
+                                <th class="p-4">住房人員</th>
+                                <th class="p-4">Surname</th>
+                                <th class="p-4">Given and Middle Name</th>
+                                <th class="p-4">入住日期</th>
+                                <th class="p-4">退房日期</th>
                                 <th class="p-4">訂房確認碼</th>
+                                <th class="p-4">備註</th>
                                 <th class="p-3 text-center">已預訂</th>
-                                <th class="p-3 text-center">已入住確認</th>
-                                <th class="p-4 text-right">操作</th>
                             </tr>
                         </thead>
                         <tbody id="table-accommodation-body" class="divide-y divide-slate-100"></tbody>
@@ -297,12 +470,16 @@
                 </div>
             </div>
 
-            <!-- 新增/修改嘉賓交通安排表單 -->
-            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
-                <h3 id="trans-form-title" class="text-sm font-bold text-slate-800 flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-brand-600"></span> 新增嘉賓交通檔案
-                </h3>
-                <form id="form-transport" onsubmit="handleTransportSubmit(event)" class="space-y-4">
+            <!-- 1. 新增嘉賓交通檔案（摺疊） -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                <div class="flex justify-between items-center p-4 sm:p-5 cursor-pointer select-none" onclick="toggleTransForm()">
+                    <h3 id="trans-form-title" class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-brand-600"></span> 新增嘉賓交通檔案
+                    </h3>
+                    <button type="button" id="trans-toggle-form-btn" class="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded-lg hover:bg-slate-100">▼ 展開</button>
+                </div>
+                <div id="trans-form-wrapper" class="hidden px-4 sm:px-5 pb-5 border-t border-slate-100">
+                    <form id="form-transport" onsubmit="handleTransportSubmit(event)" oninput="markFormDirty()" class="space-y-4 pt-4">
                     <input type="hidden" id="trans-id">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
@@ -331,6 +508,20 @@
                         <button type="submit" id="trans-submit-btn" class="text-sm bg-brand-600 text-white font-medium py-2.5 px-6 rounded-xl shadow-sm">儲存交通安排</button>
                     </div>
                 </form>
+                </div>
+            </div>
+
+            <!-- 交通狀態篩選 + 排序 -->
+            <div class="bg-white p-3.5 sm:px-5 rounded-2xl shadow-sm border border-slate-200/80 flex flex-wrap items-center gap-2">
+                <span class="text-xs font-semibold text-slate-500 mr-1">狀態：</span>
+                <button type="button" onclick="setTransStatusFilter('all')" id="trans-filter-all" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-800 shadow-sm border border-slate-200 transition">全部</button>
+                <button type="button" onclick="setTransStatusFilter('no-legs')" id="trans-filter-no-legs" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 border border-transparent transition">無行程</button>
+                <button type="button" onclick="setTransStatusFilter('pending')" id="trans-filter-pending" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 border border-transparent transition">未完成</button>
+                <button type="button" onclick="setTransStatusFilter('done')" id="trans-filter-done" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 border border-transparent transition">已完成</button>
+                <select id="trans-sort" onchange="transSort=this.value;renderTransport()" class="ml-2 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:ring-2 focus:ring-brand-500 outline-none">
+                    <option value="name-asc">姓名 A→Z</option>
+                    <option value="name-desc">姓名 Z→A</option>
+                </select>
             </div>
 
             <!-- 交通安排總覽卡片清單 -->
@@ -352,28 +543,36 @@
                 </div>
             </div>
 
-            <!-- 表單區 -->
             <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80">
-                <form id="form-venue" onsubmit="handleGenericSubmit(event, 'venue')" class="flex flex-col sm:flex-row gap-3">
+                <form id="form-venue" onsubmit="handleGenericSubmit(event, 'venue')" oninput="markFormDirty()" class="flex flex-col gap-3">
                     <input type="hidden" id="venue-item-id">
-                    <input type="text" id="venue-input-name" required placeholder="工作項目內容..." class="flex-1 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                    <input type="text" id="venue-input-sub" placeholder="負責人或備註..." class="sm:w-64 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                    <div class="flex gap-2">
-                        <button type="submit" id="venue-submit-btn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm px-6 py-3 rounded-xl shadow-sm transition shrink-0 flex-1 sm:flex-none">新增</button>
-                        <button type="button" id="venue-cancel-btn" onclick="resetGenericForm('venue')" class="hidden bg-slate-100 text-slate-700 text-sm px-4 py-3 rounded-xl shrink-0">取消</button>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <input type="text" id="venue-input-name" required placeholder="工作項目內容..." class="flex-1 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        <input type="text" id="venue-input-sub" placeholder="負責人或備註..." class="sm:w-48 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        <select id="venue-input-priority" class="sm:w-28 border border-slate-200 rounded-xl px-3 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                            <option value="normal">優先：中</option>
+                            <option value="high">優先：高</option>
+                            <option value="low">優先：低</option>
+                        </select>
+                        <input type="date" id="venue-input-deadline" title="截止日期" class="sm:w-40 border border-slate-200 rounded-xl px-3 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        <div class="flex gap-2">
+                            <button type="submit" id="venue-submit-btn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm px-6 py-3 rounded-xl shadow-sm transition shrink-0 flex-1 sm:flex-none">新增</button>
+                            <button type="button" id="venue-cancel-btn" onclick="resetGenericForm('venue')" class="hidden bg-slate-100 text-slate-700 text-sm px-4 py-3 rounded-xl shrink-0">取消</button>
+                        </div>
                     </div>
                 </form>
             </div>
 
-            <!-- 清單數據表格 -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
                 <div class="overflow-x-auto pb-4">
                     <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-max">
                         <thead>
-                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold">
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold text-xs">
                                 <th class="p-4 w-12 text-center">狀態</th>
                                 <th class="p-4">工作項目內容</th>
                                 <th class="p-4">負責人 / 備註</th>
+                                <th class="p-4">優先</th>
+                                <th class="p-4">截止日期</th>
                                 <th class="p-4 text-right">操作</th>
                             </tr>
                         </thead>
@@ -396,28 +595,36 @@
                 </div>
             </div>
 
-            <!-- 表單區 -->
             <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80">
-                <form id="form-catering" onsubmit="handleGenericSubmit(event, 'catering')" class="flex flex-col sm:flex-row gap-3">
+                <form id="form-catering" onsubmit="handleGenericSubmit(event, 'catering')" oninput="markFormDirty()" class="flex flex-col gap-3">
                     <input type="hidden" id="catering-item-id">
-                    <input type="text" id="catering-input-name" required placeholder="工作項目內容..." class="flex-1 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                    <input type="text" id="catering-input-sub" placeholder="負責人或備註..." class="sm:w-64 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                    <div class="flex gap-2">
-                        <button type="submit" id="catering-submit-btn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm px-6 py-3 rounded-xl shadow-sm transition shrink-0 flex-1 sm:flex-none">新增</button>
-                        <button type="button" id="catering-cancel-btn" onclick="resetGenericForm('catering')" class="hidden bg-slate-100 text-slate-700 text-sm px-4 py-3 rounded-xl shrink-0">取消</button>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <input type="text" id="catering-input-name" required placeholder="工作項目內容..." class="flex-1 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        <input type="text" id="catering-input-sub" placeholder="負責人或備註..." class="sm:w-48 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        <select id="catering-input-priority" class="sm:w-28 border border-slate-200 rounded-xl px-3 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                            <option value="normal">優先：中</option>
+                            <option value="high">優先：高</option>
+                            <option value="low">優先：低</option>
+                        </select>
+                        <input type="date" id="catering-input-deadline" title="截止日期" class="sm:w-40 border border-slate-200 rounded-xl px-3 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        <div class="flex gap-2">
+                            <button type="submit" id="catering-submit-btn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm px-6 py-3 rounded-xl shadow-sm transition shrink-0 flex-1 sm:flex-none">新增</button>
+                            <button type="button" id="catering-cancel-btn" onclick="resetGenericForm('catering')" class="hidden bg-slate-100 text-slate-700 text-sm px-4 py-3 rounded-xl shrink-0">取消</button>
+                        </div>
                     </div>
                 </form>
             </div>
 
-            <!-- 清單數據表格 -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
                 <div class="overflow-x-auto pb-4">
                     <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-max">
                         <thead>
-                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold">
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold text-xs">
                                 <th class="p-4 w-12 text-center">狀態</th>
                                 <th class="p-4">工作項目內容</th>
                                 <th class="p-4">負責人 / 備註</th>
+                                <th class="p-4">優先</th>
+                                <th class="p-4">截止日期</th>
                                 <th class="p-4 text-right">操作</th>
                             </tr>
                         </thead>
@@ -440,28 +647,36 @@
                 </div>
             </div>
 
-            <!-- 表單區 -->
             <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80">
-                <form id="form-design" onsubmit="handleGenericSubmit(event, 'design')" class="flex flex-col sm:flex-row gap-3">
+                <form id="form-design" onsubmit="handleGenericSubmit(event, 'design')" oninput="markFormDirty()" class="flex flex-col gap-3">
                     <input type="hidden" id="design-item-id">
-                    <input type="text" id="design-input-name" required placeholder="工作項目內容..." class="flex-1 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                    <input type="text" id="design-input-sub" placeholder="負責人或備註..." class="sm:w-64 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                    <div class="flex gap-2">
-                        <button type="submit" id="design-submit-btn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm px-6 py-3 rounded-xl shadow-sm transition shrink-0 flex-1 sm:flex-none">新增</button>
-                        <button type="button" id="design-cancel-btn" onclick="resetGenericForm('design')" class="hidden bg-slate-100 text-slate-700 text-sm px-4 py-3 rounded-xl shrink-0">取消</button>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <input type="text" id="design-input-name" required placeholder="工作項目內容..." class="flex-1 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        <input type="text" id="design-input-sub" placeholder="負責人或備註..." class="sm:w-48 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        <select id="design-input-priority" class="sm:w-28 border border-slate-200 rounded-xl px-3 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                            <option value="normal">優先：中</option>
+                            <option value="high">優先：高</option>
+                            <option value="low">優先：低</option>
+                        </select>
+                        <input type="date" id="design-input-deadline" title="截止日期" class="sm:w-40 border border-slate-200 rounded-xl px-3 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        <div class="flex gap-2">
+                            <button type="submit" id="design-submit-btn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm px-6 py-3 rounded-xl shadow-sm transition shrink-0 flex-1 sm:flex-none">新增</button>
+                            <button type="button" id="design-cancel-btn" onclick="resetGenericForm('design')" class="hidden bg-slate-100 text-slate-700 text-sm px-4 py-3 rounded-xl shrink-0">取消</button>
+                        </div>
                     </div>
                 </form>
             </div>
 
-            <!-- 清單數據表格 -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
                 <div class="overflow-x-auto pb-4">
                     <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-max">
                         <thead>
-                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold">
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold text-xs">
                                 <th class="p-4 w-12 text-center">狀態</th>
                                 <th class="p-4">工作項目內容</th>
                                 <th class="p-4">負責人 / 備註</th>
+                                <th class="p-4">優先</th>
+                                <th class="p-4">截止日期</th>
                                 <th class="p-4 text-right">操作</th>
                             </tr>
                         </thead>
@@ -484,28 +699,36 @@
                 </div>
             </div>
 
-            <!-- 表單區 -->
             <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80">
-                <form id="form-pr" onsubmit="handleGenericSubmit(event, 'pr')" class="flex flex-col sm:flex-row gap-3">
+                <form id="form-pr" onsubmit="handleGenericSubmit(event, 'pr')" oninput="markFormDirty()" class="flex flex-col gap-3">
                     <input type="hidden" id="pr-item-id">
-                    <input type="text" id="pr-input-name" required placeholder="工作項目內容..." class="flex-1 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                    <input type="text" id="pr-input-sub" placeholder="負責人或備註..." class="sm:w-64 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
-                    <div class="flex gap-2">
-                        <button type="submit" id="pr-submit-btn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm px-6 py-3 rounded-xl shadow-sm transition shrink-0 flex-1 sm:flex-none">新增</button>
-                        <button type="button" id="pr-cancel-btn" onclick="resetGenericForm('pr')" class="hidden bg-slate-100 text-slate-700 text-sm px-4 py-3 rounded-xl shrink-0">取消</button>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <input type="text" id="pr-input-name" required placeholder="工作項目內容..." class="flex-1 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        <input type="text" id="pr-input-sub" placeholder="負責人或備註..." class="sm:w-48 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        <select id="pr-input-priority" class="sm:w-28 border border-slate-200 rounded-xl px-3 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                            <option value="normal">優先：中</option>
+                            <option value="high">優先：高</option>
+                            <option value="low">優先：低</option>
+                        </select>
+                        <input type="date" id="pr-input-deadline" title="截止日期" class="sm:w-40 border border-slate-200 rounded-xl px-3 py-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        <div class="flex gap-2">
+                            <button type="submit" id="pr-submit-btn" class="bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm px-6 py-3 rounded-xl shadow-sm transition shrink-0 flex-1 sm:flex-none">新增</button>
+                            <button type="button" id="pr-cancel-btn" onclick="resetGenericForm('pr')" class="hidden bg-slate-100 text-slate-700 text-sm px-4 py-3 rounded-xl shrink-0">取消</button>
+                        </div>
                     </div>
                 </form>
             </div>
 
-            <!-- 清單數據表格 -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
                 <div class="overflow-x-auto pb-4">
                     <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-max">
                         <thead>
-                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold">
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-semibold text-xs">
                                 <th class="p-4 w-12 text-center">狀態</th>
                                 <th class="p-4">工作項目內容</th>
                                 <th class="p-4">負責人 / 備註</th>
+                                <th class="p-4">優先</th>
+                                <th class="p-4">截止日期</th>
                                 <th class="p-4 text-right">操作</th>
                             </tr>
                         </thead>
@@ -533,13 +756,28 @@
                 <h3 id="fin-form-title" class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
                     <span class="w-2 h-2 rounded-full bg-brand-600"></span> 新增財務款項
                 </h3>
-                <form id="form-finance" onsubmit="handleFinanceSubmit(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <form id="form-finance" onsubmit="handleFinanceSubmit(event)" oninput="markFormDirty()" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <input type="hidden" id="fin-id">
                     <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">款項類別 *</label>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">收支類型 *</label>
                         <select id="fin-type" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white">
                             <option value="income">📥 收入 (Income)</option>
                             <option value="expense">📤 支出 (Expense)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">費用分類</label>
+                        <select id="fin-category" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                            <option value="">— 選擇分類 —</option>
+                            <option value="場地">場地</option>
+                            <option value="餐飲">餐飲</option>
+                            <option value="交通">交通</option>
+                            <option value="住宿">住宿</option>
+                            <option value="禮品">禮品</option>
+                            <option value="印刷">印刷</option>
+                            <option value="註冊費">註冊費</option>
+                            <option value="贊助">贊助</option>
+                            <option value="其他">其他</option>
                         </select>
                     </div>
                     <div>
@@ -548,7 +786,7 @@
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">原幣別 (Currency)</label>
-                        <select id="fin-currency" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                        <select id="fin-currency" onchange="applyDefaultRate()" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white">
                             <option value="MOP" selected>MOP (澳門元)</option>
                             <option value="HKD">HKD (港幣)</option>
                             <option value="USD">USD (美元)</option>
@@ -565,7 +803,7 @@
                         <input type="number" step="1" id="fin-qty" value="1" oninput="updateFinTotalCalc()" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-slate-600 mb-1">對 MOP 匯率</label>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">對 MOP 匯率 <span class="text-slate-400 font-normal">（可手動調整）</span></label>
                         <input type="number" step="0.0001" id="fin-rate" value="1.0" oninput="updateFinTotalCalc()" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                     </div>
                     <div>
@@ -575,6 +813,10 @@
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">付款方/收款方</label>
                         <input type="text" id="fin-payer" placeholder="付款 or 收款單位..." class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">單據編號 / 備註</label>
+                        <input type="text" id="fin-voucher" placeholder="發票號、收據備註..." class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                     </div>
                     <div class="sm:col-span-2 lg:col-span-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-2">
                         <label class="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200">
@@ -649,21 +891,24 @@
                 <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
                     <span id="guest-progress-badge" class="text-xs sm:text-sm font-bold bg-brand-50 text-brand-700 px-4 py-2 rounded-xl border border-brand-100 text-center">總嘉賓: 0</span>
                     <button onclick="exportCSV('guests')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition whitespace-nowrap">📥 匯出 CSV</button>
-                    <!-- 新增：匯入 CSV 按鈕 -->
                     <label class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition cursor-pointer whitespace-nowrap inline-flex items-center gap-1">
-                        📤 匯入 CSV
-                        <input type="file" accept=".csv" class="hidden" onchange="importCSV(event, 'guests')">
+                        📤 匯入 Excel/CSV
+                        <input type="file" accept=".csv,.xlsx,.xls" class="hidden" onchange="importCSV(event, 'guests')">
                     </label>
                     <input type="text" id="guest-search" oninput="renderGuests()" placeholder="🔍 搜尋嘉賓..." class="w-full md:w-48 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                 </div>
             </div>
 
-            <!-- 新增 / 修改嘉賓表單 -->
-            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80">
-                <h3 id="guest-form-title" class="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-brand-600"></span> 新增嘉賓資料
-                </h3>
-                <form id="form-guest" onsubmit="handleGuestSubmit(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- 1. 新增 / 修改嘉賓表單（摺疊） -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                <div class="flex justify-between items-center p-4 sm:p-5 cursor-pointer select-none" onclick="toggleGuestForm()">
+                    <h3 id="guest-form-title" class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-brand-600"></span> 新增嘉賓資料
+                    </h3>
+                    <button type="button" id="guest-toggle-form-btn" class="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded-lg hover:bg-slate-100">▼ 展開</button>
+                </div>
+                <div id="guest-form-wrapper" class="hidden px-4 sm:px-5 pb-5 border-t border-slate-100">
+<form id="form-guest" onsubmit="handleGuestSubmit(event)" oninput="markFormDirty()" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4">
                     <input type="hidden" id="guest-id">
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">姓名 *</label>
@@ -693,12 +938,10 @@
                         <label class="block text-xs font-medium text-slate-600 mb-1">聯絡人姓名</label>
                         <input type="text" id="guest-contact-name" placeholder="助理或祕書姓名" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                     </div>
-                    <!-- 聯絡人電話 -->
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">聯絡人電話</label>
                         <input type="text" id="guest-contact-phone" placeholder="+853 12345678" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                     </div>
-                    <!-- 聯絡人電郵 -->
                     <div>
                         <label class="block text-xs font-medium text-slate-600 mb-1">聯絡人電郵</label>
                         <input type="email" id="guest-contact-email" placeholder="secretary@example.com" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
@@ -707,27 +950,92 @@
                         <label class="block text-xs font-medium text-slate-600 mb-1">車牌號碼</label>
                         <input type="text" id="guest-plate" placeholder="AB-12-34" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
                     </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">出席狀態</label>
+                        <select id="guest-attendance-status" onchange="onGuestStatusChange()" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none bg-white">
+                            <option value="">— 未設定 —</option>
+                            <option value="attend">出席</option>
+                            <option value="absent">不出席</option>
+                            <option value="delegate">委派代表</option>
+                        </select>
+                    </div>
+                    <!-- 委派代表欄位（僅在選擇委派代表時顯示） -->
+                    <div id="guest-delegate-fields" class="hidden sm:col-span-2 lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">代表姓名 <span class="text-rose-500">*</span></label>
+                            <input type="text" id="guest-delegate-name" placeholder="例如：李秘書" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-600 mb-1">代表職位</label>
+                            <input type="text" id="guest-delegate-position" placeholder="例如：行政助理" class="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-brand-500 outline-none">
+                        </div>
+                    </div>
+                    <!-- 出席項目選擇（僅在選擇「出席」時顯示） -->
+                    <div id="guest-attendance-section" class="hidden sm:col-span-2 lg:col-span-4">
+                        <label class="block text-xs font-medium text-slate-600 mb-2">選擇出席項目（可直接勾選）</label>
+                        <div id="guest-attendance-checkboxes" class="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 min-h-[48px]">
+                            <span class="text-xs text-slate-400">請先在上方新增出席項目</span>
+                        </div>
+                    </div>
                     <div class="sm:col-span-2 lg:col-span-4 flex justify-end gap-3 mt-2">
                         <button type="button" id="guest-cancel-btn" onclick="resetGuestForm()" class="hidden text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 px-5 rounded-xl transition w-full sm:w-auto">取消</button>
                         <button type="submit" id="guest-submit-btn" class="text-sm bg-brand-600 hover:bg-brand-700 text-white font-medium py-2.5 px-6 rounded-xl shadow-sm transition w-full sm:w-auto">儲存嘉賓資料</button>
                     </div>
                 </form>
+            
+                </div>
+            </div>
+
+            <!-- 出席項目管理 -->
+            <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200/80 space-y-3">
+                <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-brand-600"></span> 出席項目設定（可手動新增）
+                </h3>
+                <p class="text-xs text-slate-500">在此新增會議中的出席項目（如：開幕典禮、主題演講、晚宴等），之後可為每位嘉賓勾選其出席項目。</p>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <input type="text" id="guest-attendance-option-input" placeholder="輸入新出席項目名稱，例如：開幕典禮" class="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-brand-500 outline-none" onkeydown="if(event.key==='Enter'){event.preventDefault();addAttendanceOption();}">
+                    <button type="button" onclick="addAttendanceOption()" class="bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-5 py-2.5 rounded-xl shadow-sm transition whitespace-nowrap">➕ 新增項目</button>
+                </div>
+                <div id="guest-attendance-options-list" class="flex flex-wrap gap-2 min-h-[32px]">
+                    <!-- 動態生成選項標籤 -->
+                </div>
+            </div>
+
+            <!-- 嘉賓狀態篩選 + 排序 -->
+            <div class="bg-white p-3.5 sm:px-5 rounded-2xl shadow-sm border border-slate-200/80 flex flex-wrap items-center gap-2">
+                <span class="text-xs font-semibold text-slate-500 mr-1">狀態：</span>
+                <button type="button" onclick="setGuestStatusFilter('all')" id="guest-filter-all" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-800 shadow-sm border border-slate-200 transition">全部</button>
+                <button type="button" onclick="setGuestStatusFilter('no-invite')" id="guest-filter-no-invite" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 border border-transparent transition">未發邀請</button>
+                <button type="button" onclick="setGuestStatusFilter('invited')" id="guest-filter-invited" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 border border-transparent transition">已發邀請</button>
+                <button type="button" onclick="setGuestStatusFilter('attend')" id="guest-filter-attend" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 border border-transparent transition">出席</button>
+                <button type="button" onclick="setGuestStatusFilter('absent')" id="guest-filter-absent" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 border border-transparent transition">不出席</button>
+                <button type="button" onclick="setGuestStatusFilter('delegate')" id="guest-filter-delegate" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 border border-transparent transition">委派代表</button>
+                <select id="guest-sort" onchange="guestSort=this.value;renderGuests()" class="ml-2 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:ring-2 focus:ring-brand-500 outline-none">
+                    <option value="name-asc">姓名 A→Z</option>
+                    <option value="name-desc">姓名 Z→A</option>
+                    <option value="org-asc">機構 A→Z</option>
+                </select>
             </div>
 
             <!-- 嘉賓數據表格 -->
             <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
-                <div class="overflow-x-auto pb-4">
-                    <table class="w-full text-left border-collapse text-xs sm:text-sm min-w-max">
-                        <thead>
-                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold">
-                                <th class="p-4">嘉賓名字</th>
-                                <th class="p-4">所屬機構與身分</th>
-                                <th class="p-4">聯絡信箱</th>
-                                <th class="p-4">隨行/對口聯絡人</th>
-                                <th class="p-4">聯絡人電話</th>
-                                <th class="p-4">聯絡人電郵</th>
-                                <th class="p-4">車牌號碼</th>
-                                <th class="p-4 text-right">操作</th>
+                <div class="overflow-x-auto max-h-[65vh] overflow-y-auto pb-4">
+                    <table class="w-full text-left border-collapse text-sm min-w-max">
+                        <thead class="sticky top-0 z-20">
+                            <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider font-semibold">
+                                <th class="p-3 text-center min-w-[70px]">操作</th>
+                                <th class="p-3 text-center min-w-[60px]">邀請函</th>
+                                <th class="p-3 text-center min-w-[110px]">出席狀態</th>
+                                <th class="p-3 min-w-[80px]">頭銜</th>
+                                <th class="p-4 min-w-[120px]">姓名</th>
+                                <th class="p-4 min-w-[200px]">出席項目 / 代表資訊</th>
+                                <th class="p-4 min-w-[120px]">職銜 / 職位</th>
+                                <th class="p-4 min-w-[90px]">所屬機構</th>
+                                <th class="p-4 min-w-[140px]">電郵</th>
+                                <th class="p-4 min-w-[110px]">聯絡人姓名</th>
+                                <th class="p-4 min-w-[110px]">聯絡人電話</th>
+                                <th class="p-4 min-w-[130px]">聯絡人電郵</th>
+                                <th class="p-4 min-w-[100px]">車牌號碼</th>
                             </tr>
                         </thead>
                         <tbody id="table-guests-body" class="divide-y divide-slate-100"></tbody>
@@ -739,7 +1047,7 @@
     </main>
 
     <script>
-        // 系統預設資料集 (依指定順序排列)
+        // 系統預設資料集
         const initialSchema = {
             summary: { title: "📊 會議總結" },
             speakers: {
@@ -750,7 +1058,8 @@
             guests: { 
                 title: "🤝 嘉賓管理", 
                 desc: "邀請主禮嘉賓、校領導與學術界代表。", 
-                items: [] 
+                items: [],
+                attendanceOptions: []
             },
             accommodation: {
                 title: "🏨 住宿安排",
@@ -775,11 +1084,43 @@
 
         let db = {};
         let activeTab = 'summary';
+        let speakerModeFilter = 'all';
+        let accStatusFilter = 'all';
+        let guestStatusFilter = 'all';
+        let transStatusFilter = 'all';
+        let speakerSort = 'name-asc';
+        let accSort = 'name-asc';
+        let guestSort = 'name-asc';
+        let transSort = 'name-asc';
 
         const urlParams = new URLSearchParams(window.location.search);
         const eventId = urlParams.get('id') || 'default_event';
         const eventName = urlParams.get('name');
         const STORAGE_KEY = `conf_app_db_${eventId}`;
+
+        // 預設匯率（對 MOP）
+        const DEFAULT_RATES = { MOP: 1, HKD: 1.03, USD: 8.05, RMB: 1.12, EUR: 8.70 };
+
+        // Toast 通知
+        function showToast(message, type = 'success', duration = 2400) {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            const icons = { success: '✓', error: '✕', info: 'ℹ', warn: '!' };
+            const el = document.createElement('div');
+            el.className = `toast toast-${type}`;
+            el.innerHTML = `<span class="font-bold">${icons[type] || '•'}</span><span>${message}</span>`;
+            container.appendChild(el);
+            setTimeout(() => {
+                el.style.opacity = '0';
+                el.style.transition = 'opacity 0.3s';
+                setTimeout(() => el.remove(), 300);
+            }, duration);
+        }
+
+        // 表單髒資料追蹤（切換分頁前提示）
+        let formDirty = false;
+        function markFormDirty() { formDirty = true; }
+        function clearFormDirty() { formDirty = false; }
 
         function initApp() {
             if (eventName) {
@@ -799,14 +1140,15 @@
                 try { db = JSON.parse(stored); } catch(e) { db = JSON.parse(JSON.stringify(initialSchema)); }
             } else { db = JSON.parse(JSON.stringify(initialSchema)); }
             
-            // 確保所有模組都存在且順序正確（防止舊 LocalStorage 覆蓋順序）
             const orderedSchema = JSON.parse(JSON.stringify(initialSchema));
             Object.keys(orderedSchema).forEach(k => {
                 if (db[k] && db[k].items) {
                     orderedSchema[k].items = db[k].items;
                 }
+                if (k === 'guests' && db[k] && Array.isArray(db[k].attendanceOptions)) {
+                    orderedSchema[k].attendanceOptions = db[k].attendanceOptions;
+                }
             });
-            // 保留可能存在的自訂欄位
             Object.keys(db).forEach(k => {
                 if (!orderedSchema[k]) {
                     orderedSchema[k] = db[k];
@@ -817,6 +1159,7 @@
             Object.keys(db).forEach(k => {
                 if (k !== 'summary' && !db[k].items) db[k].items = [];
             });
+            if (!db.guests.attendanceOptions) db.guests.attendanceOptions = [];
         }
 
         function saveDB() {
@@ -834,7 +1177,7 @@
                     if (!exist) {
                         accItems.push({
                             id: Date.now() + Math.floor(Math.random() * 1000), speakerId: sp.id, name: sp.name,
-                            engName: "", confirmationNo: "", booked: false, confirmed: false, isManual: false
+                            surname: "", givenName: "", confirmationNo: "", checkInDate: "", checkOutDate: "", booked: false, confirmed: false, isManual: false
                         });
                     } else {
                         exist.speakerId = sp.id;
@@ -907,6 +1250,10 @@
         }
 
         function switchTab(tabKey, filterQuery = null) {
+            if (formDirty && tabKey !== activeTab) {
+                if (!confirm('表單有未儲存的變更，確定要離開並捨棄變更嗎？')) return;
+                clearFormDirty();
+            }
             activeTab = tabKey;
             renderNav();
             document.querySelectorAll('.tab-view').forEach(el => el.classList.add('hidden'));
@@ -930,6 +1277,8 @@
                 document.getElementById('view-transport').classList.remove('hidden');
                 syncSpeakersToTransport();
                 if (filterQuery !== null) document.getElementById('trans-search').value = filterQuery;
+                // 進入分頁時表單預設收合（非編輯狀態）
+                if (!document.getElementById('trans-id').value) toggleTransForm(false);
                 renderTransport();
             } else if (tabKey === 'guests') {
                 document.getElementById('view-guests').classList.remove('hidden');
@@ -990,7 +1339,7 @@
                     mod.items.forEach(g => {
                         t += 2; 
                         if (g.invitationChecked) d++;
-                        if (g.confirmedChecked) d++;
+                        if (getGuestStatus(g)) d++;  // 有設定出席狀態即算完成
                     });
                 } else {
                     t = mod.items.length;
@@ -1028,19 +1377,67 @@
             document.getElementById('overall-task-count').innerText = `${grandDone} / ${grandTotal} 總工作項`;
         }
 
-        // --- 講者管理 ---
+        // --- 講者管理 (互動優化版) ---
+        function toggleSpeakerForm(forceState = null) {
+            const wrapper = document.getElementById('sp-form-wrapper');
+            const isHidden = wrapper.classList.contains('hidden');
+            const show = forceState !== null ? forceState : isHidden;
+            if (show) {
+                wrapper.classList.remove('hidden');
+            } else {
+                wrapper.classList.add('hidden');
+            }
+        }
+
+        function setSpeakerModeFilter(mode) {
+            speakerModeFilter = mode;
+            ['all', 'in-person', 'online'].forEach(m => {
+                const btn = document.getElementById(`sp-filter-${m}`);
+                if (!btn) return;
+                if (m === mode) {
+                    btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-800 shadow-sm transition';
+                } else {
+                    btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 transition';
+                }
+            });
+            renderSpeakers();
+        }
+
         function renderSpeakers() {
             const tbody = document.getElementById('table-speakers-body');
             tbody.innerHTML = '';
             const filter = (document.getElementById('speaker-search').value || '').toLowerCase();
 
-            const items = db.speakers.items.filter(s => 
-                s.name.toLowerCase().includes(filter) || (s.org && s.org.toLowerCase().includes(filter))
-            );
+            let items = db.speakers.items.filter(s => {
+                const matchText = (s.name && s.name.toLowerCase().includes(filter)) ||
+                                  (s.org && s.org.toLowerCase().includes(filter)) ||
+                                  (s.topic && s.topic.toLowerCase().includes(filter)) ||
+                                  (s.identity && s.identity.toLowerCase().includes(filter));
+                const currentMode = s.mode || 'in-person';
+                const matchMode = speakerModeFilter === 'all' || currentMode === speakerModeFilter;
+                return matchText && matchMode;
+            });
 
-            let totalTasks = items.length * 7;
+            // Sort
+            const getSpProgress = (s) => {
+                const keys = ['invitation', 'photo', 'bio', 'abstract', 'idCard', 'accommodation', 'transport'];
+                let d = 0;
+                keys.forEach(k => { if (s.tasks && s.tasks[k]) d++; });
+                return d;
+            };
+            items.sort((a, b) => {
+                if (speakerSort === 'name-asc') return (a.name || '').localeCompare(b.name || '', 'zh');
+                if (speakerSort === 'name-desc') return (b.name || '').localeCompare(a.name || '', 'zh');
+                if (speakerSort === 'progress-desc') return getSpProgress(b) - getSpProgress(a);
+                if (speakerSort === 'progress-asc') return getSpProgress(a) - getSpProgress(b);
+                return 0;
+            });
+
+            // 計算整體講者進度（基於全部講者）
+            const allSpeakers = db.speakers.items;
+            let totalTasks = allSpeakers.length * 7;
             let completedTasks = 0;
-            items.forEach(s => {
+            allSpeakers.forEach(s => {
                 const keys = ['invitation', 'photo', 'bio', 'abstract', 'idCard', 'accommodation', 'transport'];
                 keys.forEach(k => { if (s.tasks && s.tasks[k]) completedTasks++; });
             });
@@ -1048,63 +1445,137 @@
             document.getElementById('sp-progress-badge').innerText = `完成度: ${rate}% (${completedTasks}/${totalTasks})`;
 
             if (items.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="11" class="p-8 text-center text-slate-400">找不到講者資料。</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="p-10 text-center text-slate-400">找不到符合條件的講者資料。點擊右上角「➕ 新增講者」開始建立名單。</td></tr>`;
                 return;
             }
 
-            const taskKeys = ['invitation', 'photo', 'bio', 'abstract', 'idCard', 'accommodation', 'transport'];
+            const docBadges = [
+                { key: 'invitation', label: '邀請函' },
+                { key: 'photo', label: '照片' },
+                { key: 'bio', label: 'Bio' },
+                { key: 'abstract', label: '摘要' },
+                { key: 'idCard', label: '證件' }
+            ];
 
             items.forEach(sp => {
-                let taskTds = '';
-                taskKeys.forEach(k => {
-                    const checked = sp.tasks && sp.tasks[k];
-                    let extraUI = '';
-                    if (k === 'accommodation') {
-                        const accRecord = db.accommodation.items.find(a => a.speakerId === sp.id || a.name === sp.name);
-                        const isAccConfirmed = accRecord && accRecord.booked && accRecord.confirmed;
-                        if (isAccConfirmed) {
-                            extraUI = `<br><span class="mt-1 inline-block text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">住宿已確認</span>`;
-                        } else if (checked) {
-                            extraUI = `<br><button onclick="switchTab('accommodation', '${escapeHtml(sp.name)}')" class="mt-1 text-[10px] text-brand-600 bg-brand-100/50 px-1.5 py-0.5 rounded hover:bg-brand-200 transition">🏨 住宿</button>`;
-                        }
-                    } else if (k === 'transport') {
-                        const transRecord = db.transport.items.find(t => t.speakerId === sp.id || t.guestName === sp.name);
-                        const isTransAllConfirmed = transRecord && transRecord.legs && transRecord.legs.length > 0 && transRecord.legs.every(l => l.confirmed);
-                        
-                        if (isTransAllConfirmed) {
-                            extraUI = `<br><span class="mt-1 inline-block text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">交通已確認</span>`;
-                        } else if (checked) {
-                            extraUI = `<br><button onclick="switchTab('transport', '${escapeHtml(sp.name)}')" class="mt-1 text-[10px] text-brand-600 bg-brand-100/50 px-1.5 py-0.5 rounded hover:bg-brand-200 transition">🚗 交通</button>`;
-                        }
-                    }
-                    taskTds += `
-                        <td class="p-3 text-center ${k === 'accommodation' || k === 'transport' ? 'bg-brand-50/30' : ''}">
-                            <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleSpeakerTask(${sp.id}, '${k}')" class="w-5 h-5 text-brand-600 rounded border-slate-300 cursor-pointer">
-                            ${extraUI}
-                        </td>
+                const t = sp.tasks || {};
+
+                // 1. 物料狀態膠囊群組
+                const badgesHtml = docBadges.map(b => {
+                    const active = !!t[b.key];
+                    return `
+                        <button type="button" onclick="toggleSpeakerTask(${sp.id}, '${b.key}')"
+                            class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition cursor-pointer select-none ${
+                                active
+                                ? 'bg-brand-600 text-white border-brand-600 shadow-xs hover:bg-brand-700'
+                                : 'bg-white text-slate-500 border-slate-200 hover:border-brand-300 hover:text-brand-600'
+                            }">
+                            <span>${active ? '✓' : '○'}</span>
+                            <span>${b.label}</span>
+                        </button>
                     `;
-                });
+                }).join('');
+
+                // 2. 後勤支援（住宿 & 交通）— 文字本身可點擊切換頁面
+                const accRecord = db.accommodation.items.find(a => a.speakerId === sp.id || a.name === sp.name);
+                const isAccConfirmed = accRecord && accRecord.booked && accRecord.confirmed;
+                const accChecked = !!t.accommodation;
+
+                let accHtml = `
+                    <div class="flex items-center gap-1.5 text-sm">
+                        <input type="checkbox" ${accChecked ? 'checked' : ''} onchange="toggleSpeakerTask(${sp.id}, 'accommodation')" class="w-4 h-4 text-brand-600 rounded border-slate-300 cursor-pointer">
+                        <button type="button" onclick="switchTab('accommodation', '${escapeHtml(sp.name)}')" class="font-medium ${accChecked ? 'text-brand-700 hover:underline' : 'text-slate-500 hover:text-brand-600'} transition">住宿</button>
+                        ${isAccConfirmed ? `<span class="text-xs bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded">已確認</span>` : ''}
+                    </div>
+                `;
+
+                const transRecord = db.transport.items.find(tr => tr.speakerId === sp.id || tr.guestName === sp.name);
+                const isTransConfirmed = transRecord && transRecord.legs && transRecord.legs.length > 0 && transRecord.legs.every(l => l.confirmed);
+                const transChecked = !!t.transport;
+
+                let transHtml = `
+                    <div class="flex items-center gap-1.5 text-sm mt-1">
+                        <input type="checkbox" ${transChecked ? 'checked' : ''} onchange="toggleSpeakerTask(${sp.id}, 'transport')" class="w-4 h-4 text-brand-600 rounded border-slate-300 cursor-pointer">
+                        <button type="button" onclick="switchTab('transport', '${escapeHtml(sp.name)}')" class="font-medium ${transChecked ? 'text-brand-700 hover:underline' : 'text-slate-500 hover:text-brand-600'} transition">交通</button>
+                        ${isTransConfirmed ? `<span class="text-xs bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded">已確認</span>` : ''}
+                    </div>
+                `;
+
+                // 3. 標籤與行程摘要
+                const modeLabel = sp.mode === 'online'
+                    ? `<span class="text-xs bg-violet-100 text-violet-700 font-bold px-1.5 py-0.5 rounded">線上</span>`
+                    : `<span class="text-xs bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded">現場</span>`;
+                const identityBadge = sp.identity
+                    ? `<span class="text-xs bg-amber-50 text-amber-700 border border-amber-200/80 font-semibold px-1.5 py-0.5 rounded mt-0.5 inline-block">${escapeHtml(sp.identity)}</span>`
+                    : '<span class="text-xs text-slate-300">-</span>';
+
+                const fmtShortTime = (dt) => {
+                    if (!dt) return '';
+                    const clean = dt.replace('T', ' ');
+                    return clean.length >= 16 ? clean.slice(5, 16) : clean;
+                };
+                const arrFull = [sp.arrivalTime ? sp.arrivalTime.replace('T', ' ') : '', sp.arrivalFlight, sp.arrivalLocation].filter(Boolean).join(' ');
+                const depFull = [sp.departureTime ? sp.departureTime.replace('T', ' ') : '', sp.departureFlight, sp.departureLocation].filter(Boolean).join(' ');
+
+                const arrLine = arrFull
+                    ? `<div class="text-sm text-slate-700 truncate max-w-[175px]" title="到達：${escapeHtml(arrFull)}"><span class="inline-block w-4 text-emerald-600 font-bold">到</span> ${escapeHtml(fmtShortTime(sp.arrivalTime))} <span class="font-semibold">${escapeHtml(sp.arrivalFlight || '')}</span></div>`
+                    : '';
+                const depLine = depFull
+                    ? `<div class="text-sm text-slate-700 truncate max-w-[175px] mt-1" title="離開：${escapeHtml(depFull)}"><span class="inline-block w-4 text-rose-600 font-bold">離</span> ${escapeHtml(fmtShortTime(sp.departureTime))} <span class="font-semibold">${escapeHtml(sp.departureFlight || '')}</span></div>`
+                    : '';
+                const travelCell = (arrLine || depLine) ? `${arrLine}${depLine}` : '<span class="text-slate-300 text-sm">未填寫行程</span>';
 
                 tbody.innerHTML += `
-                    <tr class="hover:bg-slate-50/80 transition">
-                        <td class="p-4">
-                            <div class="font-bold text-slate-900 flex items-center gap-2">
-                                <span class="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded">${escapeHtml(sp.title)}</span>
-                                ${escapeHtml(sp.name)}
+                    <tr class="group hover:bg-slate-50/90 transition">
+                        <!-- 操作 -->
+                        <td class="p-2 sticky left-0 z-10 bg-white group-hover:bg-slate-50 transition sticky-col-shadow align-top text-center">
+                            <div class="flex flex-col items-center gap-1">
+                                <button onclick="editSpeaker(${sp.id})" class="w-8 h-8 flex items-center justify-center text-brand-600 hover:text-brand-800 bg-brand-50 hover:bg-brand-100 rounded-lg text-sm transition" title="修改">✏️</button>
+                                <button onclick="deleteSpeaker(${sp.id})" class="w-8 h-8 flex items-center justify-center text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 rounded-lg text-sm transition" title="刪除">🗑️</button>
                             </div>
-                            <div class="text-xs text-slate-500 mt-1">${escapeHtml(sp.position || '-')} @ ${escapeHtml(sp.org || '-')}</div>
                         </td>
-                        <td class="p-4">
-                            <div class="text-xs text-slate-700">${escapeHtml(sp.email || '-')}</div>
-                            <div class="text-[11px] text-brand-600 font-medium mt-1">${escapeHtml(sp.identity || '-')}</div>
+                        <!-- 方式 / 身份 (上下排列) -->
+                        <td class="p-3 align-top text-center">
+                            <div class="flex flex-col items-center gap-0.5">
+                                ${modeLabel}
+                                ${identityBadge}
+                            </div>
                         </td>
-                        ${taskTds}
-                        <td class="p-4">
-                            <input type="text" value="${escapeHtml(sp.remark || '')}" onchange="updateSpeakerRemark(${sp.id}, this.value)" placeholder="填寫備註..." class="w-28 sm:w-36 bg-transparent border-b border-slate-200 focus:border-brand-500 text-xs outline-none py-1">
+                        <!-- 姓名 -->
+                        <td class="p-4 align-top">
+                            <div class="font-bold text-slate-900 text-sm">
+                                <span class="text-xs font-semibold text-slate-500 mr-1">${escapeHtml(sp.title)}</span>${escapeHtml(sp.name)}
+                            </div>
                         </td>
-                        <td class="p-4 text-right whitespace-nowrap">
-                            <button onclick="editSpeaker(${sp.id})" class="text-brand-600 hover:text-brand-800 font-medium px-2.5 py-1.5 bg-brand-50 rounded-lg mr-1 text-xs">修改</button>
-                            <button onclick="deleteSpeaker(${sp.id})" class="text-rose-600 hover:text-rose-800 font-medium px-2.5 py-1.5 bg-rose-50 rounded-lg text-xs">刪除</button>
+                        <!-- 機構 -->
+                        <td class="p-4 align-top whitespace-normal max-w-[180px]">
+                            <div class="text-sm text-slate-700 leading-snug">${escapeHtml(sp.org || '-')}</div>
+                            ${sp.position ? `<div class="text-xs text-slate-400 mt-0.5">${escapeHtml(sp.position)}</div>` : ''}
+                        </td>
+                        <!-- 電郵 -->
+                        <td class="p-4 align-top">
+                            <div class="text-sm text-slate-600 truncate max-w-[150px]" title="${escapeHtml(sp.email || '')}">
+                                ${sp.email ? escapeHtml(sp.email) : '<span class="text-slate-300">-</span>'}
+                            </div>
+                        </td>
+                        <!-- 物料繳交狀態 (上下/換行排列) -->
+                        <td class="p-4 align-top whitespace-normal max-w-[240px]">
+                            <div class="flex flex-wrap gap-1.5">
+                                ${badgesHtml}
+                            </div>
+                        </td>
+                        <!-- 後勤支援 -->
+                        <td class="p-3 align-top bg-brand-50/20">
+                            ${accHtml}
+                            ${transHtml}
+                        </td>
+                        <!-- 行程摘要 -->
+                        <td class="p-4 align-top">
+                            ${travelCell}
+                        </td>
+                        <!-- 備註 -->
+                        <td class="p-4 align-top">
+                            <input type="text" value="${escapeHtml(sp.remark || '')}" onchange="updateSpeakerRemark(${sp.id}, this.value)" placeholder="點擊輸入備註..." class="w-32 bg-transparent border-b border-slate-200 focus:border-brand-500 text-sm outline-none py-1 text-slate-700">
                         </td>
                     </tr>
                 `;
@@ -1137,27 +1608,59 @@
             const payload = {
                 name: document.getElementById('sp-name').value.trim(), title: finalTitle,
                 position: document.getElementById('sp-position').value.trim(), org: document.getElementById('sp-org').value.trim(),
-                email: document.getElementById('sp-email').value.trim(), identity: document.getElementById('sp-identity').value.trim()
+                email: document.getElementById('sp-email').value.trim(), identity: document.getElementById('sp-identity').value.trim(),
+                mode: document.getElementById('sp-mode').value,
+                topic: document.getElementById('sp-topic').value.trim(),
+                arrivalTime: document.getElementById('sp-arrival-time').value,
+                arrivalFlight: document.getElementById('sp-arrival-flight').value.trim(),
+                arrivalLocation: document.getElementById('sp-arrival-location').value.trim(),
+                departureTime: document.getElementById('sp-departure-time').value,
+                departureFlight: document.getElementById('sp-departure-flight').value.trim(),
+                departureLocation: document.getElementById('sp-departure-location').value.trim()
             };
+
+            // 重複偵測（同名或同電郵）
+            const dup = db.speakers.items.find(s => {
+                if (editId && s.id == editId) return false;
+                const sameName = s.name && payload.name && s.name.toLowerCase() === payload.name.toLowerCase();
+                const sameEmail = s.email && payload.email && s.email.toLowerCase() === payload.email.toLowerCase();
+                return sameName || sameEmail;
+            });
+            if (dup) {
+                const reason = (dup.name && payload.name && dup.name.toLowerCase() === payload.name.toLowerCase()) ? '姓名' : '電郵';
+                if (!confirm(`系統發現已有相同${reason}的講者「${dup.name}」，仍要繼續儲存嗎？`)) return;
+            }
 
             if (editId) {
                 const sp = db.speakers.items.find(s => s.id == editId);
                 if (sp) Object.assign(sp, payload);
+                showToast('講者資料已更新', 'success');
             } else {
                 db.speakers.items.push({ id: Date.now(), ...payload, tasks: { accommodation: false, transport: false }, remark: "" });
+                showToast('已新增講者', 'success');
             }
-            saveDB(); syncSpeakersToAccommodation(); syncSpeakersToTransport(); renderSpeakers(); resetSpeakerForm();
+            clearFormDirty();
+            saveDB(); syncSpeakersToAccommodation(); syncSpeakersToTransport(); renderSpeakers(); resetSpeakerForm(true);
         }
 
         function editSpeaker(id) {
             const sp = db.speakers.items.find(s => s.id === id);
             if (!sp) return;
+            toggleSpeakerForm(true);
             document.getElementById('sp-id').value = sp.id;
             document.getElementById('sp-name').value = sp.name || '';
             document.getElementById('sp-position').value = sp.position || '';
             document.getElementById('sp-org').value = sp.org || '';
             document.getElementById('sp-email').value = sp.email || '';
             document.getElementById('sp-identity').value = sp.identity || '';
+            document.getElementById('sp-mode').value = sp.mode || 'in-person';
+            document.getElementById('sp-topic').value = sp.topic || '';
+            document.getElementById('sp-arrival-time').value = sp.arrivalTime || '';
+            document.getElementById('sp-arrival-flight').value = sp.arrivalFlight || '';
+            document.getElementById('sp-arrival-location').value = sp.arrivalLocation || '';
+            document.getElementById('sp-departure-time').value = sp.departureTime || '';
+            document.getElementById('sp-departure-flight').value = sp.departureFlight || '';
+            document.getElementById('sp-departure-location').value = sp.departureLocation || '';
 
             const titleSelect = document.getElementById('sp-title');
             const customInput = document.getElementById('sp-title-custom');
@@ -1173,36 +1676,67 @@
                 customInput.value = sp.title || '';
             }
 
-            document.getElementById('sp-form-title').innerText = "修改講者資料";
+            document.getElementById('sp-form-title').innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> 修改講者資料：${escapeHtml(sp.name)}`;
             document.getElementById('sp-submit-btn').innerText = "儲存修改";
-            document.getElementById('sp-cancel-btn').classList.remove('hidden');
+            document.getElementById('sp-form-wrapper').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
 
-        function resetSpeakerForm() {
+        function resetSpeakerForm(hideAfter = false) {
             document.getElementById('form-speaker').reset();
             document.getElementById('sp-id').value = '';
             document.getElementById('sp-title-custom').classList.add('hidden');
-            document.getElementById('sp-form-title').innerText = "新增講者資料";
+            document.getElementById('sp-form-title').innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-brand-600"></span> 新增講者資料`;
             document.getElementById('sp-submit-btn').innerText = "儲存講者";
-            document.getElementById('sp-cancel-btn').classList.add('hidden');
+            clearFormDirty();
+            if (hideAfter) toggleSpeakerForm(false);
         }
 
         function deleteSpeaker(id) {
             if (confirm("確定刪除此講者嗎？")) {
                 db.speakers.items = db.speakers.items.filter(s => s.id !== id);
                 saveDB(); syncSpeakersToAccommodation(); syncSpeakersToTransport(); renderSpeakers();
+                showToast('已刪除講者', 'info');
             }
         }
 
         // --- 住宿模組 ---
+        function setAccStatusFilter(status) {
+            accStatusFilter = status;
+            ['all', 'pending', 'booked', 'confirmed'].forEach(s => {
+                const btn = document.getElementById(`acc-filter-${s}`);
+                if (!btn) return;
+                if (s === status) {
+                    btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-800 shadow-sm border border-slate-200 transition';
+                } else {
+                    btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 border border-transparent transition';
+                }
+            });
+            renderAccommodation();
+        }
+
         function renderAccommodation() {
             const tbody = document.getElementById('table-accommodation-body');
             tbody.innerHTML = '';
             const filter = (document.getElementById('acc-search').value || '').toLowerCase();
 
-            const items = db.accommodation.items.filter(a => 
-                a.name.toLowerCase().includes(filter) || (a.engName && a.engName.toLowerCase().includes(filter))
-            );
+            let items = db.accommodation.items.filter(a => {
+                const matchText = (a.name && a.name.toLowerCase().includes(filter)) ||
+                    (a.surname && a.surname.toLowerCase().includes(filter)) ||
+                    (a.givenName && a.givenName.toLowerCase().includes(filter)) ||
+                    (a.engName && a.engName.toLowerCase().includes(filter));
+                if (!matchText) return false;
+                if (accStatusFilter === 'pending') return !a.booked || !a.confirmed;
+                if (accStatusFilter === 'booked') return !!a.booked && !a.confirmed;
+                if (accStatusFilter === 'confirmed') return !!a.booked && !!a.confirmed;
+                return true;
+            });
+            items.sort((a, b) => {
+                if (accSort === 'name-asc') return (a.name || '').localeCompare(b.name || '', 'zh');
+                if (accSort === 'name-desc') return (b.name || '').localeCompare(a.name || '', 'zh');
+                if (accSort === 'checkin-asc') return (a.checkInDate || '').localeCompare(b.checkInDate || '');
+                if (accSort === 'checkin-desc') return (b.checkInDate || '').localeCompare(a.checkInDate || '');
+                return 0;
+            });
 
             let totalTasks = items.length * 2;
             let completedTasks = 0;
@@ -1214,27 +1748,30 @@
             document.getElementById('acc-progress-badge').innerText = `完成度: ${rate}% (${completedTasks}/${totalTasks})`;
 
             if (items.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400">無符合條件的住宿紀錄。</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="p-8 text-center text-slate-400">無符合條件的住宿紀錄。</td></tr>`;
                 return;
             }
 
             items.forEach(acc => {
-                const isManual = acc.isManual;
-                const badge = isManual 
-                    ? `<span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-medium mt-1 inline-block">自訂新增</span>` 
-                    : `<div class="mt-1 flex items-center gap-2"><span class="text-[10px] bg-brand-50 text-brand-600 border border-brand-200 px-1.5 py-0.5 rounded font-medium">講者同步</span><button onclick="switchTab('speakers', '${escapeHtml(acc.name)}')" class="text-[10px] text-brand-600 underline hover:text-brand-800">🎙️ 查講者</button></div>`;
+                const surnameVal = acc.surname || '';
+                const givenVal = acc.givenName || (acc.engName || '');
 
                 tbody.innerHTML += `
                     <tr class="hover:bg-slate-50/80 transition">
-                        <td class="p-4 font-bold text-slate-800">${escapeHtml(acc.name)} ${badge}</td>
-                        <td class="p-4"><input type="text" value="${escapeHtml(acc.engName || '')}" onchange="updateAccField(${acc.id}, 'engName', this.value)" placeholder="English Name" class="w-full bg-transparent border-b border-slate-200 focus:border-brand-500 text-xs sm:text-sm outline-none py-1"></td>
-                        <td class="p-4"><input type="text" value="${escapeHtml(acc.confirmationNo || '')}" onchange="updateAccField(${acc.id}, 'confirmationNo', this.value)" placeholder="預約號" class="w-full bg-transparent border-b border-slate-200 focus:border-brand-500 text-xs sm:text-sm outline-none py-1"></td>
-                        <td class="p-3 text-center"><input type="checkbox" ${acc.booked ? 'checked' : ''} onchange="toggleAccCheck(${acc.id}, 'booked')" class="w-5 h-5 text-brand-600 rounded border-slate-300 cursor-pointer"></td>
-                        <td class="p-3 text-center"><input type="checkbox" ${acc.confirmed ? 'checked' : ''} onchange="toggleAccCheck(${acc.id}, 'confirmed')" class="w-5 h-5 text-brand-600 rounded border-slate-300 cursor-pointer"></td>
-                        <td class="p-4 text-right whitespace-nowrap">
-                            <button onclick="editAcc(${acc.id})" class="text-brand-600 hover:text-brand-800 font-medium px-2.5 py-1.5 bg-brand-50 rounded-lg mr-1 text-xs">修改</button>
-                            <button onclick="deleteAcc(${acc.id})" class="text-rose-600 hover:text-rose-800 font-medium px-2.5 py-1.5 bg-rose-50 rounded-lg text-xs">刪除</button>
+                        <td class="p-2 text-center align-top">
+                            <div class="flex flex-col items-center gap-1">
+                                <button onclick="editAcc(${acc.id})" class="w-8 h-8 flex items-center justify-center text-brand-600 hover:text-brand-800 bg-brand-50 hover:bg-brand-100 rounded-lg text-sm transition" title="修改">✏️</button>
+                                <button onclick="deleteAcc(${acc.id})" class="w-8 h-8 flex items-center justify-center text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 rounded-lg text-sm transition" title="刪除">🗑️</button>
+                            </div>
                         </td>
+                        <td class="p-4 font-bold text-slate-800 text-sm">${escapeHtml(acc.name)}</td>
+                        <td class="p-4"><input type="text" value="${escapeHtml(surnameVal)}" onchange="updateAccField(${acc.id}, 'surname', this.value)" placeholder="Surname" class="w-full bg-transparent border-b border-slate-200 focus:border-brand-500 text-sm outline-none py-1"></td>
+                        <td class="p-4"><input type="text" value="${escapeHtml(givenVal)}" onchange="updateAccField(${acc.id}, 'givenName', this.value)" placeholder="Given Name" class="w-full bg-transparent border-b border-slate-200 focus:border-brand-500 text-sm outline-none py-1"></td>
+                        <td class="p-4"><input type="date" value="${escapeHtml(acc.checkInDate || '')}" onchange="updateAccField(${acc.id}, 'checkInDate', this.value)" class="w-full bg-transparent border-b border-slate-200 focus:border-brand-500 text-sm outline-none py-1"></td>
+                        <td class="p-4"><input type="date" value="${escapeHtml(acc.checkOutDate || '')}" onchange="updateAccField(${acc.id}, 'checkOutDate', this.value)" class="w-full bg-transparent border-b border-slate-200 focus:border-brand-500 text-sm outline-none py-1"></td>
+                        <td class="p-4"><input type="text" value="${escapeHtml(acc.confirmationNo || '')}" onchange="updateAccField(${acc.id}, 'confirmationNo', this.value)" placeholder="預約號" class="w-full bg-transparent border-b border-slate-200 focus:border-brand-500 text-sm outline-none py-1"></td>
+                        <td class="p-4"><input type="text" value="${escapeHtml(acc.remark || '')}" onchange="updateAccField(${acc.id}, 'remark', this.value)" placeholder="備註..." class="w-full bg-transparent border-b border-slate-200 focus:border-brand-500 text-sm outline-none py-1"></td>
+                        <td class="p-3 text-center"><input type="checkbox" ${acc.booked ? 'checked' : ''} onchange="toggleAccCheck(${acc.id}, 'booked')" class="w-5 h-5 text-brand-600 rounded border-slate-300 cursor-pointer"></td>
                     </tr>
                 `;
             });
@@ -1277,17 +1814,30 @@
         function handleAccommodationSubmit(e) {
             e.preventDefault();
             const editId = document.getElementById('acc-id').value;
+            const checkIn = document.getElementById('acc-checkin').value;
+            const checkOut = document.getElementById('acc-checkout').value;
+            if (checkIn && checkOut && checkOut < checkIn) {
+                showToast('退房日期不可早於入住日期', 'error');
+                return;
+            }
             const payload = {
                 name: document.getElementById('acc-name').value.trim(), 
-                engName: document.getElementById('acc-engname').value.trim(),
-                confirmationNo: document.getElementById('acc-confno').value.trim()
+                surname: document.getElementById('acc-surname').value.trim(),
+                givenName: document.getElementById('acc-givenname').value.trim(),
+                confirmationNo: document.getElementById('acc-confno').value.trim(),
+                checkInDate: checkIn,
+                checkOutDate: checkOut,
+                remark: document.getElementById('acc-remark').value.trim()
             };
             if (editId) {
                 const acc = db.accommodation.items.find(a => a.id == editId);
                 if (acc) Object.assign(acc, payload);
+                showToast('住宿資料已更新', 'success');
             } else {
                 db.accommodation.items.push({ id: Date.now(), ...payload, booked: false, confirmed: false, isManual: true });
+                showToast('已新增住宿人員', 'success');
             }
+            clearFormDirty();
             saveDB(); renderAccommodation(); resetAccForm();
         }
 
@@ -1295,24 +1845,48 @@
             const acc = db.accommodation.items.find(a => a.id === id);
             if (!acc) return;
             document.getElementById('acc-id').value = acc.id;
-            ['name','engName','confirmationNo'].forEach(k => document.getElementById('acc-'+k.toLowerCase()).value = acc[k] || '');
-            document.getElementById('acc-form-title').innerText = "修改住宿人員";
+            document.getElementById('acc-name').value = acc.name || '';
+            document.getElementById('acc-surname').value = acc.surname || '';
+            document.getElementById('acc-givenname').value = acc.givenName || (acc.engName || '');
+            document.getElementById('acc-confno').value = acc.confirmationNo || '';
+            document.getElementById('acc-checkin').value = acc.checkInDate || '';
+            document.getElementById('acc-checkout').value = acc.checkOutDate || '';
+            document.getElementById('acc-remark').value = acc.remark || '';
+            document.getElementById('acc-form-title').innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-500"></span> 修改住宿人員';
             document.getElementById('acc-submit-btn').innerText = "儲存修改";
             document.getElementById('acc-cancel-btn').classList.remove('hidden');
+            toggleAccForm(true);
+        }
+
+        function toggleAccForm(forceState = null) {
+            const wrapper = document.getElementById('acc-form-wrapper');
+            const btn = document.getElementById('acc-toggle-form-btn');
+            if (!wrapper) return;
+            const isHidden = wrapper.classList.contains('hidden');
+            const show = forceState !== null ? forceState : isHidden;
+            if (show) {
+                wrapper.classList.remove('hidden');
+                if (btn) btn.innerText = '▲ 收合';
+            } else {
+                wrapper.classList.add('hidden');
+                if (btn) btn.innerText = '▼ 展開';
+            }
         }
 
         function resetAccForm() {
             document.getElementById('form-accommodation').reset();
             document.getElementById('acc-id').value = '';
-            document.getElementById('acc-form-title').innerText = "手動新增 / 修改住宿人員";
+            document.getElementById('acc-form-title').innerHTML = '<span class="w-2 h-2 rounded-full bg-brand-600"></span> 手動新增 / 修改住宿人員';
             document.getElementById('acc-submit-btn').innerText = "新增住宿";
             document.getElementById('acc-cancel-btn').classList.add('hidden');
+            toggleAccForm(false);
         }
 
         function deleteAcc(id) {
             if (confirm("確定刪除此紀錄嗎？")) {
                 db.accommodation.items = db.accommodation.items.filter(a => a.id !== id);
                 saveDB(); renderAccommodation();
+                showToast('已刪除住宿紀錄', 'info');
             }
         }
 
@@ -1320,6 +1894,13 @@
         function updateFinTotalCalc() {
             const [p, q, r] = ['price','qty','rate'].map(k => parseFloat(document.getElementById('fin-'+k).value) || (k==='qty'||k==='rate'?1:0));
             document.getElementById('fin-total').value = (p * q * r).toFixed(2);
+        }
+
+        function applyDefaultRate() {
+            const cur = document.getElementById('fin-currency').value;
+            const rate = DEFAULT_RATES[cur] != null ? DEFAULT_RATES[cur] : 1;
+            document.getElementById('fin-rate').value = rate;
+            updateFinTotalCalc();
         }
 
         function renderFinance() {
@@ -1335,13 +1916,14 @@
                 isInc ? (sumInc += val) : (sumExp += val);
                 if (item.completed) completedCount++;
 
+                const catBadge = item.category ? `<span class="inline-block text-[11px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded mr-1">${escapeHtml(item.category)}</span>` : '';
                 const row = `
                     <tr class="hover:bg-slate-50/80 transition">
                         <td class="p-3"><input type="checkbox" ${item.completed ? 'checked' : ''} onchange="toggleFinItem(${item.id})" class="w-5 h-5 text-brand-600 rounded border-slate-300 cursor-pointer"></td>
-                        <td class="p-3 font-bold ${item.completed ? 'line-through text-slate-400' : 'text-slate-800'}">${escapeHtml(item.name)}<div class="text-xs text-slate-400 font-normal mt-0.5">${escapeHtml(item.currency||'MOP')}</div></td>
+                        <td class="p-3 font-bold ${item.completed ? 'line-through text-slate-400' : 'text-slate-800'}">${catBadge}${escapeHtml(item.name)}<div class="text-xs text-slate-400 font-normal mt-0.5">${escapeHtml(item.currency||'MOP')}${item.voucher ? ' · ' + escapeHtml(item.voucher) : ''}</div></td>
                         <td class="p-3 text-right text-slate-600">${(parseFloat(item.price)||0).toLocaleString()}<br><span class="text-xs text-slate-400">x ${item.qty||1} @ ${item.rate||1}</span></td>
                         <td class="p-3 text-right font-extrabold font-mono ${isInc ? 'text-emerald-600' : 'text-amber-600'}">MOP ${val.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-                        <td class="p-3 text-slate-500 text-xs">${escapeHtml(item.payer||'-')}<br>${escapeHtml(item.supplier||'-')}</td>
+                        <td class="p-3 text-slate-500 text-xs">${escapeHtml(item.payer||'-')}</td>
                         <td class="p-3 text-right whitespace-nowrap">
                             <button onclick="editFin(${item.id})" class="text-brand-600 font-medium px-2 py-1.5 bg-brand-50 rounded text-xs mr-1">修改</button>
                             <button onclick="deleteFin(${item.id})" class="text-rose-600 font-medium px-2 py-1.5 bg-rose-50 rounded text-xs">刪除</button>
@@ -1369,16 +1951,27 @@
             e.preventDefault(); updateFinTotalCalc();
             const editId = document.getElementById('fin-id').value;
             const payload = {
-                type: document.getElementById('fin-type').value, name: document.getElementById('fin-name').value.trim(),
-                currency: document.getElementById('fin-currency').value, price: parseFloat(document.getElementById('fin-price').value)||0,
-                qty: parseInt(document.getElementById('fin-qty').value)||1, rate: parseFloat(document.getElementById('fin-rate').value)||1,
-                total: parseFloat(document.getElementById('fin-total').value)||0, payer: document.getElementById('fin-payer').value.trim(),
+                type: document.getElementById('fin-type').value,
+                name: document.getElementById('fin-name').value.trim(),
+                category: document.getElementById('fin-category').value,
+                currency: document.getElementById('fin-currency').value,
+                price: parseFloat(document.getElementById('fin-price').value)||0,
+                qty: parseInt(document.getElementById('fin-qty').value)||1,
+                rate: parseFloat(document.getElementById('fin-rate').value)||1,
+                total: parseFloat(document.getElementById('fin-total').value)||0,
+                payer: document.getElementById('fin-payer').value.trim(),
+                voucher: document.getElementById('fin-voucher').value.trim(),
                 completed: document.getElementById('fin-completed').checked
             };
             if (editId) {
                 const item = db.finance.items.find(f => f.id == editId);
                 if (item) Object.assign(item, payload);
-            } else { db.finance.items.push({ id: Date.now(), ...payload }); }
+                showToast('財務項目已更新', 'success');
+            } else {
+                db.finance.items.push({ id: Date.now(), ...payload });
+                showToast('已新增財務紀錄', 'success');
+            }
+            clearFormDirty();
             saveDB(); renderFinance(); resetFinForm();
         }
 
@@ -1386,13 +1979,15 @@
             const i = db.finance.items.find(f => f.id === id);
             if (!i) return;
             document.getElementById('fin-id').value = i.id;
-            ['type','name','currency','price','qty','rate','total','payer','completed'].forEach(k => {
+            ['type','name','category','currency','price','qty','rate','total','payer','voucher','completed'].forEach(k => {
                 const el = document.getElementById('fin-'+k);
+                if (!el) return;
                 if (el.type === 'checkbox') el.checked = i[k]; else el.value = i[k] || '';
             });
             document.getElementById('fin-form-title').innerText = "修改項目";
             document.getElementById('fin-submit-btn').innerText = "儲存修改";
             document.getElementById('fin-cancel-btn').classList.remove('hidden');
+            markFormDirty();
         }
 
         function resetFinForm() {
@@ -1402,10 +1997,15 @@
             document.getElementById('fin-form-title').innerText = "新增財務款項";
             document.getElementById('fin-submit-btn').innerText = "新增紀錄";
             document.getElementById('fin-cancel-btn').classList.add('hidden');
+            clearFormDirty();
         }
 
         function deleteFin(id) {
-            if (confirm("確定刪除此筆財務項目？")) { db.finance.items = db.finance.items.filter(f => f.id !== id); saveDB(); renderFinance(); }
+            if (confirm("確定刪除此筆財務項目？")) {
+                db.finance.items = db.finance.items.filter(f => f.id !== id);
+                saveDB(); renderFinance();
+                showToast('已刪除財務項目', 'info');
+            }
         }
 
         // --- 交通安排模組 ---
@@ -1442,11 +2042,38 @@
             container.insertAdjacentHTML('beforeend', html);
         }
 
+        function setTransStatusFilter(status) {
+            transStatusFilter = status;
+            ['all', 'no-legs', 'pending', 'done'].forEach(s => {
+                const btn = document.getElementById(`trans-filter-${s}`);
+                if (!btn) return;
+                if (s === status) {
+                    btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-800 shadow-sm border border-slate-200 transition';
+                } else {
+                    btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 border border-transparent transition';
+                }
+            });
+            renderTransport();
+        }
+
         function renderTransport() {
             const listContainer = document.getElementById('transport-cards-list');
             listContainer.innerHTML = '';
             const filter = (document.getElementById('trans-search').value || '').toLowerCase();
-            const items = db.transport.items.filter(item => item.guestName.toLowerCase().includes(filter));
+            let items = db.transport.items.filter(item => item.guestName.toLowerCase().includes(filter));
+
+            if (transStatusFilter === 'no-legs') {
+                items = items.filter(item => !item.legs || item.legs.length === 0);
+            } else if (transStatusFilter === 'pending') {
+                items = items.filter(item => item.legs && item.legs.length > 0 && item.legs.some(l => !l.confirmed));
+            } else if (transStatusFilter === 'done') {
+                items = items.filter(item => item.legs && item.legs.length > 0 && item.legs.every(l => l.confirmed));
+            }
+            items.sort((a, b) => {
+                if (transSort === 'name-asc') return (a.guestName || '').localeCompare(b.guestName || '', 'zh');
+                if (transSort === 'name-desc') return (b.guestName || '').localeCompare(a.guestName || '', 'zh');
+                return 0;
+            });
 
             const totalGuests = db.transport.items.length;
             let totalLegs = 0;
@@ -1472,23 +2099,23 @@
                     item.legs.forEach((leg, idx) => {
                         legsHtml += `
                             <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
-                                <td class="p-3 text-xs font-bold text-brand-600 align-middle">行程 #${idx + 1}</td>
-                                <td class="p-3 text-xs text-slate-700 align-middle">📅 ${escapeHtml(leg.date || '-')} <br>⏰ ${escapeHtml(leg.time || '-')}</td>
-                                <td class="p-3 text-xs font-medium text-slate-800 align-middle">🚩 <b>起:</b> ${escapeHtml(leg.from || '-')}<br>🏁 <b>迄:</b> ${escapeHtml(leg.to || '-')}</td>
-                                <td class="p-3 text-xs font-semibold text-slate-700 text-center align-middle">👥 ${escapeHtml(leg.passengers || '1')} 人</td>
+                                <td class="p-3 text-sm font-bold text-brand-600 align-middle">行程 #${idx + 1}</td>
+                                <td class="p-3 text-sm text-slate-700 align-middle">📅 ${escapeHtml(leg.date || '-')} <br>⏰ ${escapeHtml(leg.time || '-')}</td>
+                                <td class="p-3 text-sm font-medium text-slate-800 align-middle">🚩 <b>起:</b> ${escapeHtml(leg.from || '-')}<br>🏁 <b>迄:</b> ${escapeHtml(leg.to || '-')}</td>
+                                <td class="p-3 text-sm font-semibold text-slate-700 text-center align-middle">👥 ${escapeHtml(leg.passengers || '1')} 人</td>
                                 <td class="p-3 align-middle">
                                     <div class="space-y-2 w-56 sm:w-64 bg-slate-50/80 p-2.5 rounded-xl border border-slate-200">
                                         <div class="flex items-center gap-2">
-                                            <span class="text-[11px] font-semibold text-slate-600 w-14 shrink-0">車牌號碼</span>
-                                            <input type="text" value="${escapeHtml(leg.plate || '')}" onchange="updateLegField(${item.id}, ${idx}, 'plate', this.value)" placeholder="請輸入車牌" class="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none focus:border-brand-500">
+                                            <span class="text-xs font-semibold text-slate-600 w-14 shrink-0">車牌號碼</span>
+                                            <input type="text" value="${escapeHtml(leg.plate || '')}" onchange="updateLegField(${item.id}, ${idx}, 'plate', this.value)" placeholder="請輸入車牌" class="w-full bg-white border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:border-brand-500">
                                         </div>
                                         <div class="flex items-center gap-2">
-                                            <span class="text-[11px] font-semibold text-slate-600 w-14 shrink-0">司機姓名</span>
-                                            <input type="text" value="${escapeHtml(leg.driverName || '')}" onchange="updateLegField(${item.id}, ${idx}, 'driverName', this.value)" placeholder="請輸入司機姓名" class="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none focus:border-brand-500">
+                                            <span class="text-xs font-semibold text-slate-600 w-14 shrink-0">司機姓名</span>
+                                            <input type="text" value="${escapeHtml(leg.driverName || '')}" onchange="updateLegField(${item.id}, ${idx}, 'driverName', this.value)" placeholder="請輸入司機姓名" class="w-full bg-white border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:border-brand-500">
                                         </div>
                                         <div class="flex items-center gap-2">
-                                            <span class="text-[11px] font-semibold text-slate-600 w-14 shrink-0">聯絡電話</span>
-                                            <input type="text" value="${escapeHtml(leg.driverPhone || '')}" onchange="updateLegField(${item.id}, ${idx}, 'driverPhone', this.value)" placeholder="請輸入電話" class="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs outline-none focus:border-brand-500">
+                                            <span class="text-xs font-semibold text-slate-600 w-14 shrink-0">聯絡電話</span>
+                                            <input type="text" value="${escapeHtml(leg.driverPhone || '')}" onchange="updateLegField(${item.id}, ${idx}, 'driverPhone', this.value)" placeholder="請輸入電話" class="w-full bg-white border border-slate-200 rounded px-2 py-1 text-sm outline-none focus:border-brand-500">
                                         </div>
                                     </div>
                                 </td>
@@ -1499,40 +2126,47 @@
                         `;
                     });
                 } else {
-                    legsHtml = `<tr><td colspan="6" class="p-4 text-center text-xs text-slate-400">尚無詳細交通行程段落。</td></tr>`;
+                    legsHtml = `<tr><td colspan="6" class="p-4 text-center text-sm text-slate-400">尚無詳細交通行程段落。</td></tr>`;
                 }
 
+                const legCount = (item.legs && item.legs.length) ? item.legs.length : 0;
+                const doneCount = (item.legs || []).filter(l => l.confirmed).length;
                 listContainer.innerHTML += `
-                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 space-y-4">
-                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3">
-                            <div>
-                                <h3 class="font-bold text-slate-900 text-base flex items-center gap-2">
-                                    👤 ${escapeHtml(item.guestName)}
-                                </h3>
-                                <p class="text-xs text-slate-500 mt-0.5">備註：${escapeHtml(item.remark || '無')}</p>
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 p-4 sm:p-5 cursor-pointer select-none hover:bg-slate-50/80 transition" onclick="toggleTransCard(${item.id})">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <span id="trans-card-arrow-${item.id}" class="text-slate-400 text-xs shrink-0">▼</span>
+                                <div class="min-w-0">
+                                    <h3 class="font-bold text-slate-900 text-base flex items-center gap-2 flex-wrap">
+                                        👤 ${escapeHtml(item.guestName)}
+                                        <span class="text-xs font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded">${doneCount}/${legCount} 行程</span>
+                                    </h3>
+                                    <p class="text-sm text-slate-500 mt-0.5 truncate">備註：${escapeHtml(item.remark || '無')}</p>
+                                </div>
                             </div>
-                            <div class="flex items-center gap-2">
-                                <button onclick="editTransport(${item.id})" class="text-brand-600 hover:text-brand-800 bg-brand-50 font-medium px-3 py-1.5 rounded-lg text-xs transition">修改安排</button>
-                                <button onclick="deleteTransport(${item.id})" class="text-rose-600 hover:text-rose-800 bg-rose-50 font-medium px-3 py-1.5 rounded-lg text-xs transition">刪除嘉賓</button>
+                            <div class="flex items-center gap-1 shrink-0" onclick="event.stopPropagation()">
+                                <button onclick="editTransport(${item.id})" class="w-8 h-8 flex items-center justify-center text-brand-600 hover:text-brand-800 bg-brand-50 hover:bg-brand-100 rounded-lg text-sm transition" title="修改">✏️</button>
+                                <button onclick="deleteTransport(${item.id})" class="w-8 h-8 flex items-center justify-center text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 rounded-lg text-sm transition" title="刪除">🗑️</button>
                             </div>
                         </div>
-
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr class="bg-slate-50/70 text-slate-400 text-[11px] uppercase tracking-wider font-semibold">
-                                        <th class="p-3">序號</th>
-                                        <th class="p-3">日期與時間</th>
-                                        <th class="p-3">起點與終點</th>
-                                        <th class="p-3 text-center">乘車人數</th>
-                                        <th class="p-3">車牌 / 司機 / 電話</th>
-                                        <th class="p-3 text-center">行程確認</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${legsHtml}
-                                </tbody>
-                            </table>
+                        <div id="trans-card-body-${item.id}" class="hidden px-4 sm:px-5 pb-5 border-t border-slate-100">
+                            <div class="overflow-x-auto pt-3">
+                                <table class="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr class="bg-slate-50/70 text-slate-500 text-xs uppercase tracking-wider font-semibold">
+                                            <th class="p-3">序號</th>
+                                            <th class="p-3">日期與時間</th>
+                                            <th class="p-3">起點與終點</th>
+                                            <th class="p-3 text-center">乘車人數</th>
+                                            <th class="p-3">車牌 / 司機 / 電話</th>
+                                            <th class="p-3 text-center">行程確認</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${legsHtml}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1615,9 +2249,11 @@
                 });
             }
 
+            clearFormDirty();
             saveDB();
             renderTransport();
             resetTransportForm();
+            showToast(editId ? '交通安排已更新' : '已新增交通安排', 'success');
         }
 
         function editTransport(id) {
@@ -1636,10 +2272,41 @@
                 addTransportLegRow();
             }
 
-            document.getElementById('trans-form-title').innerText = "修改嘉賓交通安排";
+            document.getElementById('trans-form-title').innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-500"></span> 修改嘉賓交通安排';
             document.getElementById('trans-submit-btn').innerText = "儲存修改";
             document.getElementById('trans-cancel-btn').classList.remove('hidden');
+            toggleTransForm(true);
             window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+
+        function toggleTransCard(id) {
+            const body = document.getElementById('trans-card-body-' + id);
+            const arrow = document.getElementById('trans-card-arrow-' + id);
+            if (!body) return;
+            const isHidden = body.classList.contains('hidden');
+            if (isHidden) {
+                body.classList.remove('hidden');
+                if (arrow) arrow.innerText = '▲';
+            } else {
+                body.classList.add('hidden');
+                if (arrow) arrow.innerText = '▼';
+            }
+        }
+
+        function toggleTransForm(forceState = null) {
+            const wrapper = document.getElementById('trans-form-wrapper');
+            const btn = document.getElementById('trans-toggle-form-btn');
+            if (!wrapper) return;
+            const isHidden = wrapper.classList.contains('hidden');
+            const show = forceState !== null ? forceState : isHidden;
+            if (show) {
+                wrapper.classList.remove('hidden');
+                if (btn) btn.innerText = '▲ 收合';
+            } else {
+                wrapper.classList.add('hidden');
+                if (btn) btn.innerText = '▼ 展開';
+            }
         }
 
         function resetTransportForm() {
@@ -1647,9 +2314,10 @@
             document.getElementById('trans-id').value = '';
             document.getElementById('transport-legs-container').innerHTML = '';
             addTransportLegRow();
-            document.getElementById('trans-form-title').innerText = "新增嘉賓交通檔案";
+            document.getElementById('trans-form-title').innerHTML = '<span class="w-2 h-2 rounded-full bg-brand-600"></span> 新增嘉賓交通檔案';
             document.getElementById('trans-submit-btn').innerText = "儲存交通安排";
             document.getElementById('trans-cancel-btn').classList.add('hidden');
+            toggleTransForm(false);
         }
 
         function deleteTransport(id) {
@@ -1657,68 +2325,269 @@
                 db.transport.items = db.transport.items.filter(i => i.id !== id);
                 saveDB();
                 renderTransport();
+                showToast('已刪除交通安排', 'info');
             }
         }
 
         // --- 10. 嘉賓管理模組 ---
+        function renderAttendanceOptions() {
+            const listEl = document.getElementById('guest-attendance-options-list');
+            const checkboxesEl = document.getElementById('guest-attendance-checkboxes');
+            if (!listEl || !checkboxesEl) return;
+
+            const options = db.guests.attendanceOptions || [];
+            if (options.length === 0) {
+                listEl.innerHTML = '<span class="text-xs text-slate-400">尚未新增任何出席項目</span>';
+                checkboxesEl.innerHTML = '<span class="text-xs text-slate-400">請先在上方新增出席項目</span>';
+                return;
+            }
+
+            listEl.innerHTML = options.map((opt, idx) => `
+                <span class="inline-flex items-center gap-1.5 bg-brand-50 text-brand-700 border border-brand-200 text-xs font-medium px-2.5 py-1 rounded-full">
+                    ${escapeHtml(opt)}
+                    <button type="button" onclick="removeAttendanceOption(${idx})" class="text-rose-500 hover:text-rose-700 font-bold leading-none" title="刪除">×</button>
+                </span>
+            `).join('');
+
+            const currentChecked = Array.from(checkboxesEl.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+            checkboxesEl.innerHTML = options.map(opt => {
+                const checked = currentChecked.includes(opt) ? 'checked' : '';
+                return `
+                    <label class="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:border-brand-300 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-700 cursor-pointer transition">
+                        <input type="checkbox" value="${escapeHtml(opt)}" class="guest-attend-cb w-3.5 h-3.5 text-brand-600 rounded border-slate-300" ${checked}>
+                        <span>${escapeHtml(opt)}</span>
+                    </label>
+                `;
+            }).join('');
+        }
+
+        function addAttendanceOption() {
+            const input = document.getElementById('guest-attendance-option-input');
+            const val = (input.value || '').trim();
+            if (!val) return;
+            if (!db.guests.attendanceOptions) db.guests.attendanceOptions = [];
+            if (db.guests.attendanceOptions.includes(val)) {
+                alert('此出席項目已存在。');
+                return;
+            }
+            db.guests.attendanceOptions.push(val);
+            saveDB();
+            input.value = '';
+            renderAttendanceOptions();
+        }
+
+        function removeAttendanceOption(idx) {
+            if (!confirm('確定刪除此出席項目？已勾選此項目的嘉賓將自動取消該選項。')) return;
+            const removed = (db.guests.attendanceOptions || [])[idx];
+            db.guests.attendanceOptions.splice(idx, 1);
+            (db.guests.items || []).forEach(g => {
+                if (g.attendedItems && Array.isArray(g.attendedItems)) {
+                    g.attendedItems = g.attendedItems.filter(x => x !== removed);
+                }
+            });
+            saveDB();
+            renderAttendanceOptions();
+            renderGuests();
+        }
+
+        function getSelectedAttendanceItems() {
+            const cbs = document.querySelectorAll('#guest-attendance-checkboxes .guest-attend-cb:checked');
+            return Array.from(cbs).map(cb => cb.value);
+        }
+
+        function setAttendanceCheckboxes(selected) {
+            const selectedSet = new Set(selected || []);
+            document.querySelectorAll('#guest-attendance-checkboxes .guest-attend-cb').forEach(cb => {
+                cb.checked = selectedSet.has(cb.value);
+            });
+        }
+
+        function setGuestStatusFilter(status) {
+            guestStatusFilter = status;
+            ['all', 'no-invite', 'invited', 'attend', 'absent', 'delegate'].forEach(s => {
+                const btn = document.getElementById(`guest-filter-${s}`);
+                if (!btn) return;
+                if (s === status) {
+                    btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-slate-800 shadow-sm border border-slate-200 transition';
+                } else {
+                    btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-800 border border-transparent transition';
+                }
+            });
+            renderGuests();
+        }
+
+        function onGuestStatusChange() {
+            const status = document.getElementById('guest-attendance-status').value;
+            const attendSec = document.getElementById('guest-attendance-section');
+            const delegateSec = document.getElementById('guest-delegate-fields');
+            if (attendSec) {
+                if (status === 'attend') attendSec.classList.remove('hidden');
+                else attendSec.classList.add('hidden');
+            }
+            if (delegateSec) {
+                if (status === 'delegate') delegateSec.classList.remove('hidden');
+                else delegateSec.classList.add('hidden');
+            }
+        }
+
+        // 所屬機構：每行最多 5 個字元（強制換行顯示）
+        function breakEveryNChars(str, n = 5) {
+            if (!str) return '<span class="text-slate-300">-</span>';
+            const s = String(str);
+            let html = '';
+            for (let i = 0; i < s.length; i += n) {
+                if (i > 0) html += '<br>';
+                html += escapeHtml(s.slice(i, i + n));
+            }
+            return html;
+        }
+
+        function getGuestStatus(g) {
+            // 相容舊資料：confirmedChecked true → attend
+            if (g.attendanceStatus) return g.attendanceStatus;
+            if (g.confirmedChecked) return 'attend';
+            return '';
+        }
+
         function renderGuests() {
             const tbody = document.getElementById('table-guests-body');
             tbody.innerHTML = '';
             const filter = (document.getElementById('guest-search').value || '').toLowerCase();
 
-            const items = (db.guests.items || []).filter(g => 
+            let items = (db.guests.items || []).filter(g => 
                 (g.name && g.name.toLowerCase().includes(filter)) || 
                 (g.org && g.org.toLowerCase().includes(filter)) ||
                 (g.identity && g.identity.toLowerCase().includes(filter))
             );
+            if (guestStatusFilter === 'no-invite') items = items.filter(g => !g.invitationChecked);
+            else if (guestStatusFilter === 'invited') items = items.filter(g => g.invitationChecked && !getGuestStatus(g));
+            else if (guestStatusFilter === 'attend') items = items.filter(g => getGuestStatus(g) === 'attend');
+            else if (guestStatusFilter === 'absent') items = items.filter(g => getGuestStatus(g) === 'absent');
+            else if (guestStatusFilter === 'delegate') items = items.filter(g => getGuestStatus(g) === 'delegate');
+            items.sort((a, b) => {
+                if (guestSort === 'name-asc') return (a.name || '').localeCompare(b.name || '', 'zh');
+                if (guestSort === 'name-desc') return (b.name || '').localeCompare(a.name || '', 'zh');
+                if (guestSort === 'org-asc') return (a.org || '').localeCompare(b.org || '', 'zh');
+                return 0;
+            });
 
             document.getElementById('guest-progress-badge').innerText = `總嘉賓: ${db.guests.items.length}`;
 
+            renderAttendanceOptions();
+
             if (items.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" class="p-8 text-center text-slate-400">目前尚無嘉賓資料。</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="13" class="p-8 text-center text-slate-400">目前尚無嘉賓資料。</td></tr>`;
                 return;
             }
 
             items.forEach(g => {
+                const status = getGuestStatus(g);
+                const options = db.guests.attendanceOptions || [];
+                const attendedSet = new Set(g.attendedItems || []);
+
+                // 出席項目 / 代表資訊 欄位內容
+                let detailHtml = '';
+                if (status === 'attend') {
+                    if (options.length === 0) {
+                        detailHtml = '<span class="text-slate-300 text-sm">尚未設定出席項目</span>';
+                    } else {
+                        detailHtml = `<div class="flex flex-col gap-1.5">` + options.map(opt => {
+                            const checked = attendedSet.has(opt) ? 'checked' : '';
+                            return `<label class="inline-flex items-center gap-1.5 text-sm bg-white border border-slate-200 hover:border-violet-300 px-2 py-1 rounded cursor-pointer transition">
+                                <input type="checkbox" ${checked} onchange="toggleGuestAttendance(${g.id}, '${escapeHtml(opt)}')" class="w-3.5 h-3.5 text-violet-600 rounded">
+                                <span class="${checked ? 'text-violet-700 font-semibold' : 'text-slate-600'}">${escapeHtml(opt)}</span>
+                            </label>`;
+                        }).join('') + `</div>`;
+                    }
+                } else if (status === 'delegate') {
+                    const dName = g.delegateName || '';
+                    const dPos = g.delegatePosition || '';
+                    detailHtml = `
+                        <div class="text-sm space-y-1">
+                            <div class="font-semibold text-amber-700">👤 代表：${escapeHtml(dName) || '<span class="text-slate-400">未填寫</span>'}</div>
+                            ${dPos ? `<div class="text-xs text-slate-500">職位：${escapeHtml(dPos)}</div>` : ''}
+                        </div>
+                    `;
+                } else if (status === 'absent') {
+                    detailHtml = '<span class="text-slate-400 text-sm">不出席</span>';
+                } else {
+                    detailHtml = '<span class="text-slate-300 text-sm">—</span>';
+                }
+
+                // 出席狀態下拉
+                const statusSelect = `
+                    <select onchange="updateGuestAttendanceStatus(${g.id}, this.value)" class="w-full max-w-[100px] border border-slate-200 rounded-lg px-1.5 py-1 text-xs bg-white focus:ring-2 focus:ring-brand-500 outline-none">
+                        <option value="" ${!status ? 'selected' : ''}>未設定</option>
+                        <option value="attend" ${status === 'attend' ? 'selected' : ''}>出席</option>
+                        <option value="absent" ${status === 'absent' ? 'selected' : ''}>不出席</option>
+                        <option value="delegate" ${status === 'delegate' ? 'selected' : ''}>委派代表</option>
+                    </select>
+                `;
+
                 tbody.innerHTML += `
                     <tr class="hover:bg-slate-50/80 transition">
-                        <td class="p-4">
-                            <div class="flex items-center gap-2 mb-1">
-                                <label class="flex items-center gap-1 text-[11px] bg-slate-100 px-2 py-0.5 rounded cursor-pointer border border-slate-200" title="可勾選邀請函">
-                                    <input type="checkbox" ${g.invitationChecked ? 'checked' : ''} onchange="toggleGuestCheck(${g.id}, 'invitationChecked')" class="w-3.5 h-3.5 text-brand-600 rounded">
-                                    <span>邀請函</span>
-                                </label>
-                                <label class="flex items-center gap-1 text-[11px] bg-emerald-50 px-2 py-0.5 rounded cursor-pointer border border-emerald-200 text-emerald-800" title="可勾選已確認">
-                                    <input type="checkbox" ${g.confirmedChecked ? 'checked' : ''} onchange="toggleGuestCheck(${g.id}, 'confirmedChecked')" class="w-3.5 h-3.5 text-emerald-600 rounded">
-                                    <span>已確認</span>
-                                </label>
+                        <td class="p-2 text-center align-top">
+                            <div class="flex flex-col items-center gap-1">
+                                <button onclick="editGuest(${g.id})" class="w-8 h-8 flex items-center justify-center text-brand-600 hover:text-brand-800 bg-brand-50 hover:bg-brand-100 rounded-lg text-sm transition" title="修改">✏️</button>
+                                <button onclick="deleteGuest(${g.id})" class="w-8 h-8 flex items-center justify-center text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 rounded-lg text-sm transition" title="刪除">🗑️</button>
                             </div>
-                            <div class="font-bold text-slate-900 flex items-center gap-2 mt-1">
-                                <span class="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded">${escapeHtml(g.title || '-')}</span>
-                                ${escapeHtml(g.name)}
-                            </div>
-                            <div class="text-xs text-slate-500 mt-1">${escapeHtml(g.position || '-')}</div>
                         </td>
-                        <td class="p-4">
-                            <div class="text-xs font-semibold text-slate-800">${escapeHtml(g.org || '-')}</div>
-                            <div class="text-[11px] text-brand-600 font-medium mt-0.5">${escapeHtml(g.identity || '-')}</div>
+                        <td class="p-3 text-center align-top">
+                            <input type="checkbox" ${g.invitationChecked ? 'checked' : ''} onchange="toggleGuestCheck(${g.id}, 'invitationChecked')" class="w-5 h-5 text-brand-600 rounded border-slate-300 cursor-pointer" title="邀請函">
                         </td>
-                        <td class="p-4 text-xs text-slate-600">${escapeHtml(g.email || '-')}</td>
-                        <td class="p-4">
-                            <div class="text-xs font-medium text-slate-800">${escapeHtml(g.contactName || '-')}</div>
+                        <td class="p-3 text-center align-top">
+                            ${statusSelect}
                         </td>
-                        <td class="p-4 text-xs text-slate-600">${escapeHtml(g.contactPhone || '-')}</td>
-                        <td class="p-4 text-xs text-slate-600">${escapeHtml(g.contactEmail || '-')}</td>
-                        <td class="p-4">
-                            <span class="text-xs font-mono font-bold bg-slate-100 text-slate-700 px-2 py-1 rounded">${escapeHtml(g.plate || '-')}</span>
+                        <td class="p-3 align-top">
+                            <span class="text-sm text-slate-600 font-medium">${escapeHtml(g.title || '-')}</span>
                         </td>
-                        <td class="p-4 text-right whitespace-nowrap">
-                            <button onclick="editGuest(${g.id})" class="text-brand-600 hover:text-brand-800 font-medium px-2.5 py-1.5 bg-brand-50 rounded-lg mr-1 text-xs">修改</button>
-                            <button onclick="deleteGuest(${g.id})" class="text-rose-600 hover:text-rose-800 font-medium px-2.5 py-1.5 bg-rose-50 rounded-lg text-xs">刪除</button>
+                        <td class="p-4 align-top">
+                            <div class="font-bold text-slate-900 text-sm">${escapeHtml(g.name)}</div>
+                            ${g.identity ? `<div class="text-xs text-brand-600 font-medium mt-0.5">${escapeHtml(g.identity)}</div>` : ''}
+                        </td>
+                        <td class="p-4 align-top whitespace-normal max-w-[220px]">${detailHtml}</td>
+                        <td class="p-4 align-top text-sm text-slate-700">${escapeHtml(g.position || '-')}</td>
+                        <td class="p-4 align-top text-sm text-slate-700 leading-tight">${breakEveryNChars(g.org || '', 5)}</td>
+                        <td class="p-4 align-top text-sm text-slate-600">${escapeHtml(g.email || '-')}</td>
+                        <td class="p-4 align-top text-sm text-slate-700">${escapeHtml(g.contactName || '-')}</td>
+                        <td class="p-4 align-top text-sm text-slate-600">${escapeHtml(g.contactPhone || '-')}</td>
+                        <td class="p-4 align-top text-sm text-slate-600">${escapeHtml(g.contactEmail || '-')}</td>
+                        <td class="p-4 align-top">
+                            <span class="text-sm font-mono font-bold bg-slate-100 text-slate-700 px-2 py-1 rounded">${escapeHtml(g.plate || '-')}</span>
                         </td>
                     </tr>
                 `;
             });
+        }
+
+        function updateGuestAttendanceStatus(id, status) {
+            const g = db.guests.items.find(item => item.id === id);
+            if (!g) return;
+            g.attendanceStatus = status;
+            // 清除舊 confirmedChecked 相容欄位
+            delete g.confirmedChecked;
+            if (status !== 'attend') {
+                // 非出席時可選擇清空出席項目（保留資料以免誤刪）
+            }
+            if (status !== 'delegate') {
+                // 非委派時不清空代表資料，保留以方便切換
+            }
+            saveDB();
+            renderGuests();
+        }
+
+        function toggleGuestAttendance(guestId, option) {
+            const g = db.guests.items.find(item => item.id === guestId);
+            if (!g) return;
+            if (!g.attendedItems) g.attendedItems = [];
+            const idx = g.attendedItems.indexOf(option);
+            if (idx >= 0) {
+                g.attendedItems.splice(idx, 1);
+            } else {
+                g.attendedItems.push(option);
+            }
+            saveDB();
+            renderGuests();
         }
 
         function toggleGuestCheck(id, field) {
@@ -1733,6 +2602,7 @@
         function handleGuestSubmit(e) {
             e.preventDefault();
             const editId = document.getElementById('guest-id').value;
+            const status = document.getElementById('guest-attendance-status').value;
             const payload = {
                 name: document.getElementById('guest-name').value.trim(),
                 title: document.getElementById('guest-title').value.trim(),
@@ -1743,20 +2613,44 @@
                 contactName: document.getElementById('guest-contact-name').value.trim(),
                 contactPhone: document.getElementById('guest-contact-phone').value.trim(),
                 contactEmail: document.getElementById('guest-contact-email').value.trim(),
-                plate: document.getElementById('guest-plate').value.trim()
+                plate: document.getElementById('guest-plate').value.trim(),
+                attendanceStatus: status,
+                delegateName: status === 'delegate' ? (document.getElementById('guest-delegate-name').value.trim()) : '',
+                delegatePosition: status === 'delegate' ? (document.getElementById('guest-delegate-position').value.trim()) : '',
+                attendedItems: status === 'attend' ? getSelectedAttendanceItems() : []
             };
+
+            if (status === 'delegate' && !payload.delegateName) {
+                showToast('請填寫代表姓名', 'error');
+                return;
+            }
+
+            const dup = (db.guests.items || []).find(g => {
+                if (editId && g.id == editId) return false;
+                const sameName = g.name && payload.name && g.name.toLowerCase() === payload.name.toLowerCase();
+                const sameEmail = g.email && payload.email && g.email.toLowerCase() === payload.email.toLowerCase();
+                return sameName || sameEmail;
+            });
+            if (dup) {
+                const reason = (dup.name && payload.name && dup.name.toLowerCase() === payload.name.toLowerCase()) ? '姓名' : '電郵';
+                if (!confirm(`系統發現已有相同${reason}的嘉賓「${dup.name}」，仍要繼續儲存嗎？`)) return;
+            }
 
             if (editId) {
                 const g = db.guests.items.find(item => item.id == editId);
                 if (g) {
                     payload.invitationChecked = g.invitationChecked || false;
-                    payload.confirmedChecked = g.confirmedChecked || false;
+                    // 清除舊欄位
+                    delete g.confirmedChecked;
                     Object.assign(g, payload);
                 }
+                showToast('嘉賓資料已更新', 'success');
             } else {
                 if(!db.guests.items) db.guests.items = [];
-                db.guests.items.push({ id: Date.now(), ...payload, invitationChecked: false, confirmedChecked: false });
+                db.guests.items.push({ id: Date.now(), ...payload, invitationChecked: false });
+                showToast('已新增嘉賓', 'success');
             }
+            clearFormDirty();
             saveDB();
             renderGuests();
             resetGuestForm();
@@ -1777,18 +2671,49 @@
             document.getElementById('guest-contact-email').value = g.contactEmail || '';
             document.getElementById('guest-plate').value = g.plate || '';
 
-            document.getElementById('guest-form-title').innerText = "修改嘉賓資料";
+            const status = getGuestStatus(g);
+            document.getElementById('guest-attendance-status').value = status || '';
+            document.getElementById('guest-delegate-name').value = g.delegateName || '';
+            document.getElementById('guest-delegate-position').value = g.delegatePosition || '';
+            onGuestStatusChange();
+
+            renderAttendanceOptions();
+            setAttendanceCheckboxes(g.attendedItems || []);
+
+            document.getElementById('guest-form-title').innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-500"></span> 修改嘉賓資料';
             document.getElementById('guest-submit-btn').innerText = "儲存修改";
             document.getElementById('guest-cancel-btn').classList.remove('hidden');
+            toggleGuestForm(true);
             window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function toggleGuestForm(forceState = null) {
+            const wrapper = document.getElementById('guest-form-wrapper');
+            const btn = document.getElementById('guest-toggle-form-btn');
+            if (!wrapper) return;
+            const isHidden = wrapper.classList.contains('hidden');
+            const show = forceState !== null ? forceState : isHidden;
+            if (show) {
+                wrapper.classList.remove('hidden');
+                if (btn) btn.innerText = '▲ 收合';
+            } else {
+                wrapper.classList.add('hidden');
+                if (btn) btn.innerText = '▼ 展開';
+            }
         }
 
         function resetGuestForm() {
             document.getElementById('form-guest').reset();
             document.getElementById('guest-id').value = '';
-            document.getElementById('guest-form-title').innerText = "新增嘉賓資料";
+            document.getElementById('guest-attendance-status').value = '';
+            document.getElementById('guest-delegate-name').value = '';
+            document.getElementById('guest-delegate-position').value = '';
+            setAttendanceCheckboxes([]);
+            onGuestStatusChange();
+            document.getElementById('guest-form-title').innerHTML = '<span class="w-2 h-2 rounded-full bg-brand-600"></span> 新增嘉賓資料';
             document.getElementById('guest-submit-btn').innerText = "儲存嘉賓資料";
             document.getElementById('guest-cancel-btn').classList.add('hidden');
+            toggleGuestForm(false);
         }
 
         function deleteGuest(id) {
@@ -1796,10 +2721,11 @@
                 db.guests.items = db.guests.items.filter(item => item.id !== id);
                 saveDB();
                 renderGuests();
+                showToast('已刪除嘉賓', 'info');
             }
         }
 
-        // --- 通用任務模組 (場地設備、餐飲規劃、設計物料、公關徵稿) ---
+        // --- 通用任務模組 ---
         function renderGenericModule(modKey) {
             const mod = db[modKey];
             const titleEl = document.getElementById(`gen-module-title-${modKey}`);
@@ -1817,14 +2743,32 @@
             const rate = items.length > 0 ? Math.round((dCount / items.length) * 100) : 0;
             if (badgeEl) badgeEl.innerText = `完成度: ${rate}% (${dCount}/${items.length})`;
 
-            if (items.length === 0) { tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-400">尚無工作項目內容。</td></tr>`; return; }
+            // 未完成優先排序
+            const sorted = [...items].sort((a, b) => {
+                if (!!a.completed !== !!b.completed) return a.completed ? 1 : -1;
+                const pMap = { high: 0, normal: 1, low: 2 };
+                const pa = pMap[a.priority] != null ? pMap[a.priority] : 1;
+                const pb = pMap[b.priority] != null ? pMap[b.priority] : 1;
+                if (pa !== pb) return pa - pb;
+                return (a.deadline || '9999').localeCompare(b.deadline || '9999');
+            });
 
-            items.forEach(item => {
+            if (sorted.length === 0) { tbody.innerHTML = `<tr><td colspan="6" class="p-8 text-center text-slate-400">尚無工作項目內容。</td></tr>`; return; }
+
+            const pLabel = { high: '高', normal: '中', low: '低' };
+            const pClass = { high: 'bg-rose-100 text-rose-700', normal: 'bg-slate-100 text-slate-600', low: 'bg-slate-50 text-slate-400' };
+
+            sorted.forEach(item => {
+                const pri = item.priority || 'normal';
+                const deadlineStr = item.deadline || '';
+                const overdue = deadlineStr && !item.completed && deadlineStr < new Date().toISOString().slice(0, 10);
                 tbody.innerHTML += `
                     <tr class="hover:bg-slate-50/80 transition">
                         <td class="p-4 text-center"><input type="checkbox" ${item.completed ? 'checked' : ''} onchange="toggleGenericItem('${modKey}', ${item.id})" class="w-5 h-5 text-brand-600 rounded border-slate-300 cursor-pointer"></td>
                         <td class="p-4 font-bold ${item.completed ? 'line-through text-slate-400' : 'text-slate-800'}">${escapeHtml(item.name)}</td>
-                        <td class="p-4 text-slate-500">${escapeHtml(item.sub || '-')}</td>
+                        <td class="p-4 text-slate-500 text-sm">${escapeHtml(item.sub || '-')}</td>
+                        <td class="p-4"><span class="text-xs font-semibold px-2 py-1 rounded ${pClass[pri] || pClass.normal}">${pLabel[pri] || '中'}</span></td>
+                        <td class="p-4 text-sm ${overdue ? 'text-rose-600 font-semibold' : 'text-slate-600'}">${deadlineStr || '-'}${overdue ? ' ⚠' : ''}</td>
                         <td class="p-4 text-right whitespace-nowrap">
                             <button onclick="editGenericItem('${modKey}', ${item.id})" class="text-brand-600 font-medium px-2.5 py-1.5 bg-brand-50 rounded-lg mr-1 text-xs">修改</button>
                             <button onclick="deleteGenericItem('${modKey}', ${item.id})" class="text-rose-600 font-medium px-2.5 py-1.5 bg-rose-50 rounded-lg text-xs">刪除</button>
@@ -1844,11 +2788,18 @@
             const editId = document.getElementById(`${modKey}-item-id`).value;
             const name = document.getElementById(`${modKey}-input-name`).value.trim();
             const sub = document.getElementById(`${modKey}-input-sub`).value.trim();
+            const priority = document.getElementById(`${modKey}-input-priority`).value || 'normal';
+            const deadline = document.getElementById(`${modKey}-input-deadline`).value || '';
             if (!name) return;
             if (editId) {
                 const item = db[modKey].items.find(i => i.id == editId);
-                if (item) { item.name = name; item.sub = sub; }
-            } else { db[modKey].items.push({ id: Date.now(), name, sub, completed: false }); }
+                if (item) { item.name = name; item.sub = sub; item.priority = priority; item.deadline = deadline; }
+                showToast('項目已更新', 'success');
+            } else {
+                db[modKey].items.push({ id: Date.now(), name, sub, priority, deadline, completed: false });
+                showToast('已新增工作項目', 'success');
+            }
+            clearFormDirty();
             saveDB(); renderGenericModule(modKey); resetGenericForm(modKey);
         }
 
@@ -1858,8 +2809,13 @@
             document.getElementById(`${modKey}-item-id`).value = item.id;
             document.getElementById(`${modKey}-input-name`).value = item.name;
             document.getElementById(`${modKey}-input-sub`).value = item.sub || '';
+            const priEl = document.getElementById(`${modKey}-input-priority`);
+            if (priEl) priEl.value = item.priority || 'normal';
+            const dlEl = document.getElementById(`${modKey}-input-deadline`);
+            if (dlEl) dlEl.value = item.deadline || '';
             document.getElementById(`${modKey}-submit-btn`).innerText = "儲存";
             document.getElementById(`${modKey}-cancel-btn`).classList.remove('hidden');
+            markFormDirty();
         }
 
         function resetGenericForm(modKey) {
@@ -1867,10 +2823,16 @@
             document.getElementById(`${modKey}-item-id`).value = '';
             document.getElementById(`${modKey}-submit-btn`).innerText = "新增";
             document.getElementById(`${modKey}-cancel-btn`).classList.add('hidden');
+            clearFormDirty();
         }
 
         function deleteGenericItem(modKey, id) {
-            if (confirm("確定刪除此項目？")) { db[modKey].items = db[modKey].items.filter(i => i.id !== id); saveDB(); renderGenericModule(modKey); }
+            if (confirm("確定刪除此項目？")) {
+                db[modKey].items = db[modKey].items.filter(i => i.id !== id);
+                saveDB();
+                renderGenericModule(modKey);
+                showToast('已刪除項目', 'info');
+            }
         }
 
         // --- 匯出 CSV 共通邏輯 ---
@@ -1885,25 +2847,39 @@
             let rows = [];
 
             if (modKey === 'speakers') {
-                rows.push(["姓名", "頭銜", "職位", "機構", "電郵", "身分", "邀請函", "照片", "Bio", "摘要", "證件", "住宿", "交通", "備註"]);
+                rows.push(["姓名", "頭銜", "職位", "機構", "電郵", "身分", "參與方式", "演講主題", "到達時間", "到達航班", "到達地點", "離開時間", "離開航班", "離開地點", "邀請函", "照片", "Bio", "摘要", "證件", "住宿", "交通", "備註"]);
                 mod.items.forEach(s => {
                     const t = s.tasks || {};
                     rows.push([
                         s.name, s.title, s.position, s.org, s.email, s.identity,
+                        s.mode === 'online' ? '線上' : '現場', s.topic || '',
+                        s.arrivalTime || '', s.arrivalFlight || '', s.arrivalLocation || '',
+                        s.departureTime || '', s.departureFlight || '', s.departureLocation || '',
                         t.invitation ? 'V' : '', t.photo ? 'V' : '', t.bio ? 'V' : '',
                         t.abstract ? 'V' : '', t.idCard ? 'V' : '', t.accommodation ? 'V' : '', t.transport ? 'V' : '',
                         s.remark || ''
                     ]);
                 });
             } else if (modKey === 'accommodation') {
-                rows.push(["姓名", "英文姓名", "確認號", "已預訂", "已入住確認", "來源"]);
+                rows.push(["姓名", "Surname", "Given and Middle Name", "入住日期", "退房日期", "確認號", "備註", "已預訂", "已入住確認", "來源"]);
                 mod.items.forEach(a => {
-                    rows.push([a.name, a.engName, a.confirmationNo, a.booked ? '是' : '否', a.confirmed ? '是' : '否', a.isManual ? '手動新增' : '講者同步']);
+                    rows.push([
+                        a.name,
+                        a.surname || '',
+                        a.givenName || (a.engName || ''),
+                        a.checkInDate || '',
+                        a.checkOutDate || '',
+                        a.confirmationNo || '',
+                        a.remark || '',
+                        a.booked ? '是' : '否',
+                        a.confirmed ? '是' : '否',
+                        a.isManual ? '手動新增' : '講者同步'
+                    ]);
                 });
             } else if (modKey === 'finance') {
-                rows.push(["類型", "項目名稱", "幣別", "單價", "數量", "匯率", "MOP總價", "收付款方", "狀態"]);
+                rows.push(["類型", "分類", "項目名稱", "幣別", "單價", "數量", "匯率", "MOP總價", "收付款方", "單據備註", "狀態"]);
                 mod.items.forEach(f => {
-                    rows.push([f.type === 'income' ? '收入' : '支出', f.name, f.currency, f.price, f.qty, f.rate, f.total, f.payer, f.completed ? '已結算' : '未結算']);
+                    rows.push([f.type === 'income' ? '收入' : '支出', f.category || '', f.name, f.currency, f.price, f.qty, f.rate, f.total, f.payer, f.voucher || '', f.completed ? '已結算' : '未結算']);
                 });
             } else if (modKey === 'transport') {
                 rows.push(["嘉賓姓名", "總體備註", "行程序號", "日期", "時間", "起點", "終點", "乘車人數", "車牌號碼", "司機姓名", "司機電話", "行程確認"]);
@@ -1917,14 +2893,18 @@
                     }
                 });
             } else if (modKey === 'guests') {
-                rows.push(["姓名", "頭銜", "職位", "機構", "電郵", "身份", "邀請函勾選", "已確認勾選", "聯絡人姓名", "聯絡人電話", "聯絡人電郵", "車牌號碼"]);
+                rows.push(["姓名", "頭銜", "職位", "機構", "電郵", "身份", "邀請函勾選", "出席狀態", "代表姓名", "代表職位", "聯絡人姓名", "聯絡人電話", "聯絡人電郵", "車牌號碼", "出席項目"]);
                 mod.items.forEach(g => {
-                    rows.push([g.name, g.title, g.position, g.org, g.email, g.identity, g.invitationChecked ? '是' : '否', g.confirmedChecked ? '是' : '否', g.contactName, g.contactPhone, g.contactEmail, g.plate]);
+                    const status = getGuestStatus(g);
+                    const statusLabel = status === 'attend' ? '出席' : status === 'absent' ? '不出席' : status === 'delegate' ? '委派代表' : '';
+                    const attendedStr = (g.attendedItems && g.attendedItems.length) ? g.attendedItems.join('; ') : '';
+                    rows.push([g.name, g.title, g.position, g.org, g.email, g.identity, g.invitationChecked ? '是' : '否', statusLabel, g.delegateName || '', g.delegatePosition || '', g.contactName, g.contactPhone, g.contactEmail, g.plate, attendedStr]);
                 });
             } else {
-                rows.push(["工作項目內容", "負責人/備註", "狀態"]);
+                rows.push(["工作項目內容", "負責人/備註", "優先", "截止日期", "狀態"]);
                 mod.items.forEach(i => {
-                    rows.push([i.name, i.sub || '', i.completed ? '已完成' : '未完成']);
+                    const pMap = { high: '高', normal: '中', low: '低' };
+                    rows.push([i.name, i.sub || '', pMap[i.priority] || '中', i.deadline || '', i.completed ? '已完成' : '未完成']);
                 });
             }
 
@@ -1977,39 +2957,62 @@
         function importCSV(e, modKey) {
             const file = e.target.files[0];
             if (!file) return;
+            const isExcel = /\.xlsx?$/i.test(file.name);
             const reader = new FileReader();
             reader.onload = function(evt) {
                 try {
-                    const text = evt.target.result;
-                    const rows = parseCSV(text);
+                    let rows = [];
+                    if (isExcel) {
+                        if (typeof XLSX === 'undefined') {
+                            alert("⚠️ Excel 解析庫未載入，請改用 CSV 或重新整理頁面。");
+                            return;
+                        }
+                        const data = new Uint8Array(evt.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                        rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
+                    } else {
+                        const text = evt.target.result;
+                        rows = parseCSV(text);
+                    }
                     if (rows.length < 2) {
-                        alert("⚠️ CSV 檔案格式錯誤或無內容。");
+                        alert("⚠️ 檔案格式錯誤或無內容。");
                         return;
                     }
                     
                     let importedCount = 0;
                     if (modKey === 'speakers') {
                         for (let i = 1; i < rows.length; i++) {
-                            const cols = rows[i];
+                            const cols = rows[i].map(c => (c == null ? '' : String(c)));
                             if (cols.length >= 1 && cols[0].trim()) {
+                                const modeVal = (cols[6] || '').toLowerCase();
+                                const isOnline = modeVal.includes('online') || modeVal.includes('線上');
                                 db.speakers.items.push({
-                                    id: Date.now() + Math.floor(Math.random() * 10000),
+                                    id: Date.now() + Math.floor(Math.random() * 10000) + i,
                                     name: cols[0] || '',
                                     title: cols[1] || 'Prof.',
                                     position: cols[2] || '',
                                     org: cols[3] || '',
                                     email: cols[4] || '',
                                     identity: cols[5] || '',
+                                    mode: isOnline ? 'online' : 'in-person',
+                                    topic: cols[7] || '',
+                                    arrivalTime: cols[8] || '',
+                                    arrivalFlight: cols[9] || '',
+                                    arrivalLocation: cols[10] || '',
+                                    departureTime: cols[11] || '',
+                                    departureFlight: cols[12] || '',
+                                    departureLocation: cols[13] || '',
                                     tasks: {
-                                        invitation: cols[6] === 'V',
-                                        photo: cols[7] === 'V',
-                                        bio: cols[8] === 'V',
-                                        abstract: cols[9] === 'V',
-                                        idCard: cols[10] === 'V',
-                                        accommodation: cols[11] === 'V',
-                                        transport: cols[12] === 'V'
+                                        invitation: cols[14] === 'V' || cols[14] === '是',
+                                        photo: cols[15] === 'V' || cols[15] === '是',
+                                        bio: cols[16] === 'V' || cols[16] === '是',
+                                        abstract: cols[17] === 'V' || cols[17] === '是',
+                                        idCard: cols[18] === 'V' || cols[18] === '是',
+                                        accommodation: cols[19] === 'V' || cols[19] === '是',
+                                        transport: cols[20] === 'V' || cols[20] === '是'
                                     },
-                                    remark: cols[13] || ''
+                                    remark: cols[21] || ''
                                 });
                                 importedCount++;
                             }
@@ -2020,23 +3023,68 @@
                         renderSpeakers();
                     } else if (modKey === 'guests') {
                         for (let i = 1; i < rows.length; i++) {
-                            const cols = rows[i];
+                            const cols = rows[i].map(c => (c == null ? '' : String(c)));
                             if (cols.length >= 1 && cols[0].trim()) {
                                 if(!db.guests.items) db.guests.items = [];
+                                // 支援新舊欄位順序：新版有出席狀態、代表姓名、代表職位
+                                // 舊版：邀請函, 已確認, 聯絡人... 出席項目在 cols[12]
+                                // 新版：邀請函, 出席狀態, 代表姓名, 代表職位, 聯絡人..., 出席項目在 cols[14]
+                                let invitationChecked = false;
+                                let attendanceStatus = '';
+                                let delegateName = '';
+                                let delegatePosition = '';
+                                let contactName = '', contactPhone = '', contactEmail = '', plate = '';
+                                let attendedRaw = '';
+
+                                if (cols.length >= 15 || (cols[7] && /出席|不出席|委派/.test(cols[7]))) {
+                                    // 新格式
+                                    invitationChecked = cols[6] === '是' || cols[6] === 'V';
+                                    const st = (cols[7] || '').trim();
+                                    if (st === '出席') attendanceStatus = 'attend';
+                                    else if (st === '不出席') attendanceStatus = 'absent';
+                                    else if (st === '委派代表') attendanceStatus = 'delegate';
+                                    delegateName = cols[8] || '';
+                                    delegatePosition = cols[9] || '';
+                                    contactName = cols[10] || '';
+                                    contactPhone = cols[11] || '';
+                                    contactEmail = cols[12] || '';
+                                    plate = cols[13] || '';
+                                    attendedRaw = cols[14] || '';
+                                } else {
+                                    // 舊格式相容
+                                    invitationChecked = cols[6] === '是' || cols[6] === 'V';
+                                    if (cols[7] === '是' || cols[7] === 'V') attendanceStatus = 'attend';
+                                    contactName = cols[8] || '';
+                                    contactPhone = cols[9] || '';
+                                    contactEmail = cols[10] || '';
+                                    plate = cols[11] || '';
+                                    attendedRaw = cols[12] || '';
+                                }
+
+                                const attendedItems = attendedRaw ? attendedRaw.split(/[;；]/).map(s => s.trim()).filter(Boolean) : [];
+                                if (!db.guests.attendanceOptions) db.guests.attendanceOptions = [];
+                                attendedItems.forEach(opt => {
+                                    if (opt && !db.guests.attendanceOptions.includes(opt)) {
+                                        db.guests.attendanceOptions.push(opt);
+                                    }
+                                });
                                 db.guests.items.push({
-                                    id: Date.now() + Math.floor(Math.random() * 10000),
+                                    id: Date.now() + Math.floor(Math.random() * 10000) + i,
                                     name: cols[0] || '',
                                     title: cols[1] || '',
                                     position: cols[2] || '',
                                     org: cols[3] || '',
                                     email: cols[4] || '',
                                     identity: cols[5] || '',
-                                    invitationChecked: cols[6] === '是',
-                                    confirmedChecked: cols[7] === '是',
-                                    contactName: cols[8] || '',
-                                    contactPhone: cols[9] || '',
-                                    contactEmail: cols[10] || '',
-                                    plate: cols[11] || ''
+                                    invitationChecked,
+                                    attendanceStatus,
+                                    delegateName,
+                                    delegatePosition,
+                                    contactName,
+                                    contactPhone,
+                                    contactEmail,
+                                    plate,
+                                    attendedItems
                                 });
                                 importedCount++;
                             }
@@ -2051,7 +3099,11 @@
                     console.error(err);
                 }
             };
-            reader.readAsText(file, 'UTF-8');
+            if (isExcel) {
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.readAsText(file, 'UTF-8');
+            }
         }
 
         function exportData() {
